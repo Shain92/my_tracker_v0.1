@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дашборды отслеживания выполнения - Power BI Style</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .filter-card {
+            background: white;
+            border-radius: 8px;
+            padding: 12px 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .filter-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .filter-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .filter-count-number {
+            font-weight: 700;
+            color: #667eea;
+            position: relative;
+        }
+
+        .filter-count-number:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            margin-bottom: 5px;
+            z-index: 1000;
+        }
+
+        .filter-count-number:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #333;
+            margin-bottom: -5px;
+        }
+
+        .filter-arrow {
+            font-size: 14px;
+            color: #667eea;
+            transition: transform 0.3s ease;
+            margin-left: 10px;
+        }
+
+        .filter-arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            display: none;
+        }
+
+        .dropdown-overlay.active {
+            display: block;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1001;
+            margin-top: 5px;
+            padding: 10px;
+        }
+
+        .dropdown-actions {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 10px;
+        }
+
+        .dropdown-action-btn {
+            flex: 1;
+            padding: 6px 12px;
+            border: 1px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .dropdown-action-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background: #f5f5f5;
+        }
+
+        .dropdown-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .dropdown-item-label {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .metric-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #667eea;
+            margin: 10px 0;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-change {
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .metric-change.positive {
+            color: #10b981;
+        }
+
+        .metric-change.negative {
+            color: #ef4444;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+
+        .chart-container {
+            height: 200px;
+            margin-top: 15px;
+            position: relative;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            height: 100%;
+            gap: 10px;
+        }
+
+        .bar {
+            flex: 1;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px 4px 0 0;
+            min-width: 20px;
+            position: relative;
+            transition: opacity 0.2s;
+        }
+
+        .bar:hover {
+            opacity: 0.8;
+        }
+
+        .bar-label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .list-item-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .list-item-value {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-in-progress {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .two-columns {
+            grid-column: span 2;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .two-columns {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Фильтр участков -->
+        <div class="filter-card" id="filterCard">
+            <div class="filter-title">
+                Строительные участки
+                <span class="filter-count">
+                    <span class="filter-count-number" id="selectedCount" data-tooltip="Выбрано участков">0</span>
+                    <span>/</span>
+                    <span class="filter-count-number" id="totalCount" data-tooltip="Всего участков">12</span>
+                </span>
+            </div>
+            <div class="filter-arrow" id="filterArrow">▼</div>
+        </div>
+
+        <div class="dropdown-overlay" id="dropdownOverlay">
+            <div class="dropdown-menu" id="dropdownMenu"></div>
+        </div>
+
+        <!-- Пример 1: Общий обзор -->
+        <div class="dashboard-grid">
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Активных проектов</div>
+                    <div class="card-icon" style="background: #d1fae5; color: #065f46;">📋</div>
+                </div>
+                <div class="metric-value">48</div>
+                <div class="metric-label">Проектов в работе</div>
+                <div class="metric-change positive">+5 за неделю</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Выполнение</div>
+                    <div class="card-icon" style="background: #fef3c7; color: #92400e;">📊</div>
+                </div>
+                <div class="metric-value">73.5%</div>
+                <div class="metric-label">Средний процент выполнения</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 73.5%"></div>
+                </div>
+                <div class="metric-change positive">+2.3% за неделю</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Завершено листов</div>
+                    <div class="card-icon" style="background: #e9d5ff; color: #6b21a8;">✅</div>
+                </div>
+                <div class="metric-value">342</div>
+                <div class="metric-label">из 465 проектных листов</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 73.5%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Пример 2: Выполнение по участкам -->
+        <div class="card full-width">
+            <div class="card-header">
+                <div class="card-title">Выполнение по строительным участкам</div>
+            </div>
+            <div class="chart-container">
+                <div class="bar-chart">
+                    <div class="bar" style="height: 85%">
+                        <div class="bar-label">Участок 1</div>
+                    </div>
+                    <div class="bar" style="height: 72%">
+                        <div class="bar-label">Участок 2</div>
+                    </div>
+                    <div class="bar" style="height: 91%">
+                        <div class="bar-label">Участок 3</div>
+                    </div>
+                    <div class="bar" style="height: 68%">
+                        <div class="bar-label">Участок 4</div>
+                    </div>
+                    <div class="bar" style="height: 79%">
+                        <div class="bar-label">Участок 5</div>
+                    </div>
+                    <div class="bar" style="height: 88%">
+                        <div class="bar-label">Участок 6</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Пример 3: Топ проектов -->
+        <div class="card two-columns">
+            <div class="card-header">
+                <div class="card-title">Топ проектов по выполнению</div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Проект А-001 (Шифр: ПР-2024-001)</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">Участок 3</div>
+                </div>
+                <div>
+                    <div class="list-item-value">95%</div>
+                    <span class="status-badge status-completed">Завершен</span>
+                </div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Проект Б-042 (Шифр: ПР-2024-042)</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">Участок 1</div>
+                </div>
+                <div>
+                    <div class="list-item-value">87%</div>
+                    <span class="status-badge status-in-progress">В работе</span>
+                </div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Проект В-015 (Шифр: ПР-2024-015)</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">Участок 2</div>
+                </div>
+                <div>
+                    <div class="list-item-value">82%</div>
+                    <span class="status-badge status-in-progress">В работе</span>
+                </div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Проект Г-028 (Шифр: ПР-2024-028)</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">Участок 5</div>
+                </div>
+                <div>
+                    <div class="list-item-value">78%</div>
+                    <span class="status-badge status-in-progress">В работе</span>
+                </div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Проект Д-033 (Шифр: ПР-2024-033)</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">Участок 4</div>
+                </div>
+                <div>
+                    <div class="list-item-value">65%</div>
+                    <span class="status-badge status-pending">Требует внимания</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Пример 4: Статистика по статусам -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Распределение по статусам</div>
+            </div>
+            <div class="list-item">
+                <div class="list-item-name">
+                    <span class="status-badge status-completed">Выполнено</span>
+                </div>
+                <div class="list-item-value">342</div>
+            </div>
+            <div class="list-item">
+                <div class="list-item-name">
+                    <span class="status-badge status-in-progress">В работе</span>
+                </div>
+                <div class="list-item-value">89</div>
+            </div>
+            <div class="list-item">
+                <div class="list-item-name">
+                    <span class="status-badge status-pending">Ожидает</span>
+                </div>
+                <div class="list-item-value">34</div>
+            </div>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #f0f0f0;">
+                <div class="metric-label">Всего листов</div>
+                <div class="metric-value" style="font-size: 28px;">465</div>
+            </div>
+        </div>
+
+        <!-- Пример 5: Активность по времени -->
+        <div class="card full-width">
+            <div class="card-header">
+                <div class="card-title">Динамика выполнения за последние 30 дней</div>
+            </div>
+            <div class="chart-container" style="height: 250px;">
+                <div class="bar-chart">
+                    <div class="bar" style="height: 45%"><div class="bar-label">1</div></div>
+                    <div class="bar" style="height: 52%"><div class="bar-label">2</div></div>
+                    <div class="bar" style="height: 48%"><div class="bar-label">3</div></div>
+                    <div class="bar" style="height: 61%"><div class="bar-label">4</div></div>
+                    <div class="bar" style="height: 55%"><div class="bar-label">5</div></div>
+                    <div class="bar" style="height: 68%"><div class="bar-label">6</div></div>
+                    <div class="bar" style="height: 72%"><div class="bar-label">7</div></div>
+                    <div class="bar" style="height: 65%"><div class="bar-label">8</div></div>
+                    <div class="bar" style="height: 58%"><div class="bar-label">9</div></div>
+                    <div class="bar" style="height: 64%"><div class="bar-label">10</div></div>
+                    <div class="bar" style="height: 71%"><div class="bar-label">11</div></div>
+                    <div class="bar" style="height: 69%"><div class="bar-label">12</div></div>
+                    <div class="bar" style="height: 75%"><div class="bar-label">13</div></div>
+                    <div class="bar" style="height: 73%"><div class="bar-label">14</div></div>
+                    <div class="bar" style="height: 76%"><div class="bar-label">15</div></div>
+                    <div class="bar" style="height: 74%"><div class="bar-label">16</div></div>
+                    <div class="bar" style="height: 78%"><div class="bar-label">17</div></div>
+                    <div class="bar" style="height: 81%"><div class="bar-label">18</div></div>
+                    <div class="bar" style="height: 79%"><div class="bar-label">19</div></div>
+                    <div class="bar" style="height: 82%"><div class="bar-label">20</div></div>
+                    <div class="bar" style="height: 85%"><div class="bar-label">21</div></div>
+                    <div class="bar" style="height: 83%"><div class="bar-label">22</div></div>
+                    <div class="bar" style="height: 87%"><div class="bar-label">23</div></div>
+                    <div class="bar" style="height: 84%"><div class="bar-label">24</div></div>
+                    <div class="bar" style="height: 86%"><div class="bar-label">25</div></div>
+                    <div class="bar" style="height: 88%"><div class="bar-label">26</div></div>
+                    <div class="bar" style="height: 90%"><div class="bar-label">27</div></div>
+                    <div class="bar" style="height: 89%"><div class="bar-label">28</div></div>
+                    <div class="bar" style="height: 91%"><div class="bar-label">29</div></div>
+                    <div class="bar" style="height: 94%"><div class="bar-label">30</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Пример 6: Исполнители -->
+        <div class="card two-columns">
+            <div class="card-header">
+                <div class="card-title">Нагрузка на исполнителей</div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Иванов И.И.</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">12 активных листов</div>
+                </div>
+                <div>
+                    <div class="list-item-value">85%</div>
+                    <div class="progress-bar" style="margin-top: 5px; width: 100px;">
+                        <div class="progress-fill" style="width: 85%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Петров П.П.</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">8 активных листов</div>
+                </div>
+                <div>
+                    <div class="list-item-value">92%</div>
+                    <div class="progress-bar" style="margin-top: 5px; width: 100px;">
+                        <div class="progress-fill" style="width: 92%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Сидоров С.С.</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">15 активных листов</div>
+                </div>
+                <div>
+                    <div class="list-item-value">78%</div>
+                    <div class="progress-bar" style="margin-top: 5px; width: 100px;">
+                        <div class="progress-fill" style="width: 78%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Козлов К.К.</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">10 активных листов</div>
+                </div>
+                <div>
+                    <div class="list-item-value">88%</div>
+                    <div class="progress-bar" style="margin-top: 5px; width: 100px;">
+                        <div class="progress-fill" style="width: 88%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Пример 7: Последние этапы -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Последние этапы проектов</div>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Проект А-001</div>
+                    <div style="font-size: 11px; color: #666; margin-top: 4px;">25.12.2024 14:30</div>
+                </div>
+                <span class="status-badge status-completed">Завершен</span>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Проект Б-042</div>
+                    <div style="font-size: 11px; color: #666; margin-top: 4px;">24.12.2024 16:45</div>
+                </div>
+                <span class="status-badge status-in-progress">В работе</span>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Проект В-015</div>
+                    <div style="font-size: 11px; color: #666; margin-top: 4px;">24.12.2024 11:20</div>
+                </div>
+                <span class="status-badge status-in-progress">В работе</span>
+            </div>
+            <div class="list-item">
+                <div>
+                    <div class="list-item-name">Проект Г-028</div>
+                    <div style="font-size: 11px; color: #666; margin-top: 4px;">23.12.2024 09:15</div>
+                </div>
+                <span class="status-badge status-pending">Ожидает</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Структура данных
+        const sitesData = [
+            { id: 1, name: 'Участок 1', projects: 8, completion: 85, sheets: { total: 65, completed: 55 }, executors: ['Иванов И.И.', 'Петров П.П.'] },
+            { id: 2, name: 'Участок 2', projects: 6, completion: 72, sheets: { total: 48, completed: 35 }, executors: ['Сидоров С.С.'] },
+            { id: 3, name: 'Участок 3', projects: 10, completion: 91, sheets: { total: 80, completed: 73 }, executors: ['Козлов К.К.'] },
+            { id: 4, name: 'Участок 4', projects: 5, completion: 68, sheets: { total: 40, completed: 27 }, executors: ['Иванов И.И.'] },
+            { id: 5, name: 'Участок 5', projects: 7, completion: 79, sheets: { total: 56, completed: 44 }, executors: ['Петров П.П.'] },
+            { id: 6, name: 'Участок 6', projects: 9, completion: 88, sheets: { total: 72, completed: 63 }, executors: ['Сидоров С.С.', 'Козлов К.К.'] },
+            { id: 7, name: 'Участок 7', projects: 4, completion: 75, sheets: { total: 32, completed: 24 }, executors: ['Иванов И.И.'] },
+            { id: 8, name: 'Участок 8', projects: 6, completion: 82, sheets: { total: 48, completed: 39 }, executors: ['Петров П.П.'] },
+            { id: 9, name: 'Участок 9', projects: 5, completion: 70, sheets: { total: 40, completed: 28 }, executors: ['Сидоров С.С.'] },
+            { id: 10, name: 'Участок 10', projects: 7, completion: 86, sheets: { total: 56, completed: 48 }, executors: ['Козлов К.К.'] },
+            { id: 11, name: 'Участок 11', projects: 3, completion: 65, sheets: { total: 24, completed: 16 }, executors: ['Иванов И.И.'] },
+            { id: 12, name: 'Участок 12', projects: 8, completion: 90, sheets: { total: 64, completed: 58 }, executors: ['Петров П.П.', 'Сидоров С.С.'] }
+        ];
+
+        const projectsData = [
+            { id: 1, name: 'Проект А-001', code: 'ПР-2024-001', siteId: 3, completion: 95, status: 'completed' },
+            { id: 2, name: 'Проект Б-042', code: 'ПР-2024-042', siteId: 1, completion: 87, status: 'in-progress' },
+            { id: 3, name: 'Проект В-015', code: 'ПР-2024-015', siteId: 2, completion: 82, status: 'in-progress' },
+            { id: 4, name: 'Проект Г-028', code: 'ПР-2024-028', siteId: 5, completion: 78, status: 'in-progress' },
+            { id: 5, name: 'Проект Д-033', code: 'ПР-2024-033', siteId: 4, completion: 65, status: 'pending' }
+        ];
+
+        let selectedSites = new Set(sitesData.map(s => s.id));
+        let isDropdownOpen = false;
+
+        // Инициализация dropdown
+        function initDropdown() {
+            const dropdownMenu = document.getElementById('dropdownMenu');
+            const filterCard = document.getElementById('filterCard');
+            const filterArrow = document.getElementById('filterArrow');
+            const overlay = document.getElementById('dropdownOverlay');
+
+            // Создание элементов dropdown
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'dropdown-actions';
+            
+            const selectAllBtn = document.createElement('button');
+            selectAllBtn.className = 'dropdown-action-btn';
+            selectAllBtn.textContent = 'Выбрать все';
+            selectAllBtn.onclick = () => {
+                selectedSites = new Set(sitesData.map(s => s.id));
+                renderDropdown();
+                updateFilter();
+            };
+
+            const deselectAllBtn = document.createElement('button');
+            deselectAllBtn.className = 'dropdown-action-btn';
+            deselectAllBtn.textContent = 'Снять все';
+            deselectAllBtn.onclick = () => {
+                selectedSites.clear();
+                renderDropdown();
+                updateFilter();
+            };
+
+            actionsDiv.appendChild(selectAllBtn);
+            actionsDiv.appendChild(deselectAllBtn);
+            dropdownMenu.appendChild(actionsDiv);
+
+            // Рендер списка участков
+            renderDropdown();
+
+            // Обработчики кликов
+            filterCard.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleDropdown();
+            });
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    closeDropdown();
+                }
+            });
+
+            // Позиционирование dropdown
+            function positionDropdown() {
+                const rect = filterCard.getBoundingClientRect();
+                const dropdown = document.getElementById('dropdownMenu');
+                dropdown.style.left = rect.left + 'px';
+                dropdown.style.top = (rect.bottom + 5) + 'px';
+            }
+
+            function toggleDropdown() {
+                isDropdownOpen = !isDropdownOpen;
+                if (isDropdownOpen) {
+                    overlay.classList.add('active');
+                    filterArrow.classList.add('open');
+                    positionDropdown();
+                } else {
+                    closeDropdown();
+                }
+            }
+
+            function closeDropdown() {
+                isDropdownOpen = false;
+                overlay.classList.remove('active');
+                filterArrow.classList.remove('open');
+            }
+
+            window.toggleDropdown = toggleDropdown;
+            window.closeDropdown = closeDropdown;
+        }
+
+        function renderDropdown() {
+            const dropdownMenu = document.getElementById('dropdownMenu');
+            const itemsContainer = dropdownMenu.querySelector('.dropdown-items') || document.createElement('div');
+            itemsContainer.className = 'dropdown-items';
+            
+            // Удаляем старые элементы (кроме actions)
+            const oldItems = dropdownMenu.querySelector('.dropdown-items');
+            if (oldItems) {
+                oldItems.remove();
+            }
+
+            sitesData.forEach(site => {
+                const item = document.createElement('div');
+                item.className = 'dropdown-item';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `site-${site.id}`;
+                checkbox.checked = selectedSites.has(site.id);
+                checkbox.onchange = () => {
+                    if (checkbox.checked) {
+                        selectedSites.add(site.id);
+                    } else {
+                        selectedSites.delete(site.id);
+                    }
+                    updateFilter();
+                };
+
+                const label = document.createElement('label');
+                label.className = 'dropdown-item-label';
+                label.htmlFor = `site-${site.id}`;
+                label.textContent = site.name;
+
+                item.appendChild(checkbox);
+                item.appendChild(label);
+                itemsContainer.appendChild(item);
+            });
+
+            dropdownMenu.appendChild(itemsContainer);
+        }
+
+        function updateFilter() {
+            const selectedCount = selectedSites.size;
+            const totalCount = sitesData.length;
+            
+            document.getElementById('selectedCount').textContent = selectedCount;
+            document.getElementById('totalCount').textContent = totalCount;
+
+            // Пересчет метрик
+            const filteredSites = sitesData.filter(s => selectedSites.has(s.id));
+            
+            if (filteredSites.length === 0) {
+                // Если ничего не выбрано, показываем нули
+                updateMetrics(0, 0, 0, 0, [], [], []);
+            } else {
+                const totalProjects = filteredSites.reduce((sum, s) => sum + s.projects, 0);
+                const avgCompletion = filteredSites.reduce((sum, s) => sum + s.completion, 0) / filteredSites.length;
+                const totalSheets = filteredSites.reduce((sum, s) => sum + s.sheets.total, 0);
+                const completedSheets = filteredSites.reduce((sum, s) => sum + s.sheets.completed, 0);
+                
+                const filteredProjects = projectsData.filter(p => selectedSites.has(p.siteId));
+                const filteredExecutors = getFilteredExecutors(filteredSites);
+
+                updateMetrics(totalProjects, avgCompletion, totalSheets, completedSheets, filteredSites, filteredProjects, filteredExecutors);
+            }
+        }
+
+        function getFilteredExecutors(sites) {
+            const executorMap = new Map();
+            sites.forEach(site => {
+                site.executors.forEach(executor => {
+                    if (!executorMap.has(executor)) {
+                        executorMap.set(executor, {
+                            name: executor,
+                            activeSheets: Math.floor(Math.random() * 15) + 5,
+                            completion: Math.floor(Math.random() * 20) + 75
+                        });
+                    }
+                });
+            });
+            return Array.from(executorMap.values());
+        }
+
+        function updateMetrics(totalProjects, avgCompletion, totalSheets, completedSheets, sites, projects, executors) {
+            // Активных проектов
+            const projectsCard = document.querySelector('.dashboard-grid .card:nth-child(2) .metric-value');
+            if (projectsCard) projectsCard.textContent = totalProjects;
+
+            // Выполнение
+            const completionCard = document.querySelector('.dashboard-grid .card:nth-child(3) .metric-value');
+            const completionBar = document.querySelector('.dashboard-grid .card:nth-child(3) .progress-fill');
+            if (completionCard) {
+                completionCard.textContent = avgCompletion.toFixed(1) + '%';
+            }
+            if (completionBar) {
+                completionBar.style.width = avgCompletion.toFixed(1) + '%';
+            }
+
+            // Завершено листов
+            const sheetsCard = document.querySelector('.dashboard-grid .card:nth-child(4) .metric-value');
+            const sheetsBar = document.querySelector('.dashboard-grid .card:nth-child(4) .progress-fill');
+            if (sheetsCard) {
+                sheetsCard.textContent = completedSheets;
+            }
+            if (sheetsBar && totalSheets > 0) {
+                const percentage = (completedSheets / totalSheets * 100).toFixed(1);
+                sheetsBar.style.width = percentage + '%';
+            }
+
+            // График по участкам
+            updateSitesChart(sites);
+
+            // Топ проектов
+            updateTopProjects(projects);
+
+            // Исполнители
+            updateExecutors(executors);
+
+            // Статистика по статусам
+            updateStatusStats(projects);
+        }
+
+        function updateSitesChart(sites) {
+            const chartContainer = document.querySelector('.card.full-width .bar-chart');
+            if (!chartContainer) return;
+
+            chartContainer.innerHTML = '';
+            sites.forEach(site => {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                bar.style.height = site.completion + '%';
+                
+                const label = document.createElement('div');
+                label.className = 'bar-label';
+                label.textContent = site.name;
+                
+                bar.appendChild(label);
+                chartContainer.appendChild(bar);
+            });
+        }
+
+        function updateTopProjects(projects) {
+            const topProjectsCard = document.querySelector('.card.two-columns .list-item');
+            if (!topProjectsCard) return;
+
+            const container = topProjectsCard.parentElement;
+            const header = container.querySelector('.card-header');
+            container.innerHTML = '';
+            container.appendChild(header);
+
+            const sortedProjects = [...projects].sort((a, b) => b.completion - a.completion).slice(0, 5);
+            
+            sortedProjects.forEach(project => {
+                const site = sitesData.find(s => s.id === project.siteId);
+                const item = document.createElement('div');
+                item.className = 'list-item';
+                
+                item.innerHTML = `
+                    <div>
+                        <div class="list-item-name">${project.name} (Шифр: ${project.code})</div>
+                        <div style="font-size: 12px; color: #666; margin-top: 4px;">${site ? site.name : ''}</div>
+                    </div>
+                    <div>
+                        <div class="list-item-value">${project.completion}%</div>
+                        <span class="status-badge status-${project.status}">${getStatusText(project.status)}</span>
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+
+        function updateExecutors(executors) {
+            const executorsCard = document.querySelectorAll('.card.two-columns')[1];
+            if (!executorsCard) return;
+
+            const container = executorsCard;
+            const header = container.querySelector('.card-header');
+            container.innerHTML = '';
+            container.appendChild(header);
+
+            executors.forEach(executor => {
+                const item = document.createElement('div');
+                item.className = 'list-item';
+                
+                item.innerHTML = `
+                    <div>
+                        <div class="list-item-name">${executor.name}</div>
+                        <div style="font-size: 12px; color: #666; margin-top: 4px;">${executor.activeSheets} активных листов</div>
+                    </div>
+                    <div>
+                        <div class="list-item-value">${executor.completion}%</div>
+                        <div class="progress-bar" style="margin-top: 5px; width: 100px;">
+                            <div class="progress-fill" style="width: ${executor.completion}%"></div>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+
+        function updateStatusStats(projects) {
+            const completed = projects.filter(p => p.status === 'completed').length;
+            const inProgress = projects.filter(p => p.status === 'in-progress').length;
+            const pending = projects.filter(p => p.status === 'pending').length;
+            const total = projects.length;
+
+            const statusCard = document.querySelectorAll('.card')[3];
+            if (!statusCard) return;
+
+            const container = statusCard;
+            const header = container.querySelector('.card-header');
+            container.innerHTML = '';
+            container.appendChild(header);
+
+            const statuses = [
+                { label: 'Выполнено', count: completed, class: 'status-completed' },
+                { label: 'В работе', count: inProgress, class: 'status-in-progress' },
+                { label: 'Ожидает', count: pending, class: 'status-pending' }
+            ];
+
+            statuses.forEach(status => {
+                const item = document.createElement('div');
+                item.className = 'list-item';
+                item.innerHTML = `
+                    <div class="list-item-name">
+                        <span class="status-badge ${status.class}">${status.label}</span>
+                    </div>
+                    <div class="list-item-value">${status.count}</div>
+                `;
+                container.appendChild(item);
+            });
+
+            const totalDiv = document.createElement('div');
+            totalDiv.style.cssText = 'margin-top: 15px; padding-top: 15px; border-top: 2px solid #f0f0f0;';
+            totalDiv.innerHTML = `
+                <div class="metric-label">Всего листов</div>
+                <div class="metric-value" style="font-size: 28px;">${total}</div>
+            `;
+            container.appendChild(totalDiv);
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'completed': 'Завершен',
+                'in-progress': 'В работе',
+                'pending': 'Требует внимания'
+            };
+            return statusMap[status] || status;
+        }
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', () => {
+            initDropdown();
+            updateFilter();
+        });
+    </script>
+</body>
+</html>
+

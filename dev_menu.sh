@@ -26,11 +26,12 @@ show_menu() {
     echo -e "${GREEN}5.${NC} Запуск фронтенда (Flutter)"
     echo -e "${GREEN}6.${NC} Просмотр логов"
     echo -e "${GREEN}7.${NC} Статус контейнеров"
-    echo -e "${GREEN}8.${NC} Выполнить миграции"
-    echo -e "${GREEN}9.${NC} Создать суперпользователя"
-    echo -e "${GREEN}10.${NC} Очистить volumes и остановить"
-    echo -e "${GREEN}11.${NC} Перезапустить контейнеры"
-    echo -e "${GREEN}12.${NC} Войти в контейнер backend"
+    echo -e "${GREEN}8.${NC} Создать миграции"
+    echo -e "${GREEN}9.${NC} Выполнить миграции"
+    echo -e "${GREEN}10.${NC} Создать суперпользователя"
+    echo -e "${GREEN}11.${NC} Очистить volumes и остановить"
+    echo -e "${GREEN}12.${NC} Перезапустить контейнеры"
+    echo -e "${GREEN}13.${NC} Войти в контейнер backend"
     echo -e "${YELLOW}0.${NC} Выход"
     echo ""
     echo -n "Выберите опцию: "
@@ -118,6 +119,20 @@ show_status() {
     read -p "Нажмите Enter для продолжения..."
 }
 
+# Функция создания миграций
+make_migrations() {
+    echo -e "${YELLOW}Создание миграций...${NC}"
+    echo -n "Введите имя приложения (или оставьте пустым для всех): "
+    read app_name
+    if [ -z "$app_name" ]; then
+        docker-compose -f $COMPOSE_FILE exec backend python manage.py makemigrations
+    else
+        docker-compose -f $COMPOSE_FILE exec backend python manage.py makemigrations $app_name
+    fi
+    echo -e "${GREEN}Миграции созданы!${NC}"
+    read -p "Нажмите Enter для продолжения..."
+}
+
 # Функция выполнения миграций
 run_migrations() {
     echo -e "${YELLOW}Выполнение миграций...${NC}"
@@ -190,18 +205,21 @@ while true; do
             show_status
             ;;
         8)
-            run_migrations
+            make_migrations
             ;;
         9)
-            create_superuser
+            run_migrations
             ;;
         10)
-            clean_containers
+            create_superuser
             ;;
         11)
-            restart_containers
+            clean_containers
             ;;
         12)
+            restart_containers
+            ;;
+        13)
             enter_backend
             ;;
         0)
