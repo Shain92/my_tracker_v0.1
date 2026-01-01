@@ -8,6 +8,7 @@ from . import views
 
 router = DefaultRouter()
 router.register(r'users', views.UserViewSet, basename='user')
+router.register(r'departments', views.DepartmentViewSet, basename='department')
 
 urlpatterns = [
     path('register/', views.register, name='register'),
