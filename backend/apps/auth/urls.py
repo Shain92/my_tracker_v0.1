@@ -17,6 +17,7 @@ urlpatterns = [
     path('me/', views.current_user, name='current_user'),
     path('page-permissions/', views.page_permissions, name='page_permissions'),
     path('page-permissions/update/', views.update_page_permissions, name='update_page_permissions'),
+    path('user-permissions/', views.user_permissions, name='user_permissions'),
     path('', include(router.urls)),
 ]
 
