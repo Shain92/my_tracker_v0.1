@@ -56,3 +56,37 @@ def save_user_profile(sender, instance, **kwargs):
     if hasattr(instance, 'profile'):
         instance.profile.save()
 
+
+class PagePermission(models.Model):
+    """Право доступа к странице для отдела"""
+    PAGE_CHOICES = [
+        ('home', 'Главная'),
+        ('tasks', 'Задачи'),
+        ('settings', 'Настройки'),
+        ('users_list', 'Список пользователей'),
+        ('departments_list', 'Список отделов'),
+    ]
+    
+    page_name = models.CharField(
+        'Страница',
+        max_length=50,
+        choices=PAGE_CHOICES
+    )
+    has_access = models.BooleanField(
+        'Есть доступ',
+        default=False
+    )
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        related_name='page_permissions',
+        verbose_name='Отдел'
+    )
+    
+    class Meta:
+        verbose_name = 'Право доступа к странице'
+        verbose_name_plural = 'Права доступа к страницам'
+        unique_together = [['page_name', 'department']]
+    
+    def __str__(self):
+        return f"{self.department.name} - {self.get_page_name_display()}"

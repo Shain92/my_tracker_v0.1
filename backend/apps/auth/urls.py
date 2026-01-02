@@ -15,6 +15,8 @@ urlpatterns = [
     path('login/', views.login, name='login'),
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('me/', views.current_user, name='current_user'),
+    path('page-permissions/', views.page_permissions, name='page_permissions'),
+    path('page-permissions/update/', views.update_page_permissions, name='update_page_permissions'),
     path('', include(router.urls)),
 ]
 

@@ -9,7 +9,7 @@ from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .models import Department, UserProfile
+from .models import Department, UserProfile, PagePermission
 
 
 @api_view(['POST'])
@@ -343,6 +343,22 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return None
     
+    def retrieve(self, request, *args, **kwargs):
+        """Получение одного отдела"""
+        try:
+            department = self.get_object()
+            return Response({
+                'id': department.id,
+                'name': department.name,
+                'description': department.description,
+                'color': department.color,
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
     def list(self, request, *args, **kwargs):
         """Получение списка отделов"""
         # Принудительно обновляем queryset, чтобы получить свежие данные
@@ -425,6 +441,8 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         """Удаление отдела"""
         try:
             department = self.get_object()
+            # Удаляем связанные PagePermission перед удалением отдела
+            department.page_permissions.all().delete()
             department.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
@@ -432,4 +450,85 @@ class DepartmentViewSet(viewsets.ModelViewSet):
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def page_permissions(request):
+    """Получение матрицы прав доступа"""
+    try:
+        departments = Department.objects.all().order_by('name')
+        pages = [choice[0] for choice in PagePermission.PAGE_CHOICES]
+        
+        # Получаем все права доступа
+        permissions = PagePermission.objects.select_related('department').all()
+        
+        # Формируем структуру данных
+        pages_data = []
+        for page_name, page_label in PagePermission.PAGE_CHOICES:
+            page_perms = permissions.filter(page_name=page_name).select_related('department')
+            departments_data = []
+            for perm in page_perms:
+                if perm.department:  # Защита от None
+                    departments_data.append({
+                        'department_id': perm.department.id,
+                        'department_name': perm.department.name or '',
+                        'has_access': perm.has_access,
+                    })
+            pages_data.append({
+                'page_name': page_name,
+                'page_label': page_label,
+                'departments': departments_data,
+            })
+        
+        departments_data = [
+            {
+                'id': dept.id,
+                'name': dept.name,
+            }
+            for dept in departments
+        ]
+        
+        return Response({
+            'pages': pages_data,
+            'departments': departments_data,
+        })
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_page_permissions(request):
+    """Обновление прав доступа"""
+    try:
+        permissions_data = request.data.get('permissions', [])
+        
+        for perm_data in permissions_data:
+            page_name = perm_data.get('page_name')
+            department_id = perm_data.get('department_id')
+            has_access = perm_data.get('has_access', False)
+            
+            if not page_name or not department_id:
+                continue
+            
+            try:
+                department = Department.objects.get(id=department_id)
+                PagePermission.objects.update_or_create(
+                    page_name=page_name,
+                    department=department,
+                    defaults={'has_access': has_access}
+                )
+            except Department.DoesNotExist:
+                continue
+        
+        return Response({'message': 'Права доступа обновлены'})
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
