@@ -3,13 +3,135 @@ API views для авторизации
 """
 from rest_framework import status, generics, viewsets
 from rest_framework.decorators import api_view, permission_classes, action
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser, BasePermission
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .models import Department, UserProfile, PagePermission
+
+
+class HasPagePermission(BasePermission):
+    """Проверка доступа к странице через PagePermission"""
+    
+    def __init__(self, page_name):
+        self.page_name = page_name
+        super().__init__()
+    
+    def has_permission(self, request, view):
+        # #region agent log
+        import json
+        log_path = r'r:\dev\my-tracker\my_tracker_v0.1\.cursor\debug.log'
+        try:
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'D',
+                    'location': 'views.py:HasPagePermission.has_permission',
+                    'message': 'HasPagePermission check',
+                    'data': {
+                        'user': request.user.username if request.user.is_authenticated else None,
+                        'is_superuser': request.user.is_superuser if request.user.is_authenticated else False,
+                        'page_name': self.page_name
+                    },
+                    'timestamp': int(__import__('time').time() * 1000)
+                }) + '\n')
+        except: pass
+        # #endregion
+        
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # Суперпользователь имеет доступ ко всему
+        if request.user.is_superuser:
+            # #region agent log
+            try:
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({
+                        'sessionId': 'debug-session',
+                        'runId': 'run1',
+                        'hypothesisId': 'D',
+                        'location': 'views.py:HasPagePermission.has_permission',
+                        'message': 'superuser - allowed',
+                        'data': {},
+                        'timestamp': int(__import__('time').time() * 1000)
+                    }) + '\n')
+            except: pass
+            # #endregion
+            return True
+        
+        # Получаем отдел пользователя
+        department = None
+        if hasattr(request.user, 'profile') and request.user.profile.department:
+            department = request.user.profile.department
+        
+        # #region agent log
+        try:
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'D',
+                    'location': 'views.py:HasPagePermission.has_permission',
+                    'message': 'department check',
+                    'data': {
+                        'has_profile': hasattr(request.user, 'profile'),
+                        'department_id': department.id if department else None,
+                        'department_name': department.name if department else None
+                    },
+                    'timestamp': int(__import__('time').time() * 1000)
+                }) + '\n')
+        except: pass
+        # #endregion
+        
+        # Если у пользователя нет отдела, доступ только к главной
+        if not department:
+            result = self.page_name == 'home'
+            # #region agent log
+            try:
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({
+                        'sessionId': 'debug-session',
+                        'runId': 'run1',
+                        'hypothesisId': 'D',
+                        'location': 'views.py:HasPagePermission.has_permission',
+                        'message': 'no department result',
+                        'data': {'result': result, 'page_name': self.page_name},
+                        'timestamp': int(__import__('time').time() * 1000)
+                    }) + '\n')
+            except: pass
+            # #endregion
+            return result
+        
+        # Проверяем права доступа через PagePermission
+        has_access = PagePermission.objects.filter(
+            page_name=self.page_name,
+            department=department,
+            has_access=True
+        ).exists()
+        
+        # #region agent log
+        try:
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'D',
+                    'location': 'views.py:HasPagePermission.has_permission',
+                    'message': 'permission check result',
+                    'data': {
+                        'has_access': has_access,
+                        'page_name': self.page_name,
+                        'department_id': department.id
+                    },
+                    'timestamp': int(__import__('time').time() * 1000)
+                }) + '\n')
+        except: pass
+        # #endregion
+        
+        return has_access
 
 
 @api_view(['POST'])
@@ -116,10 +238,18 @@ class UserPagination(PageNumberPagination):
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    """ViewSet для управления пользователями (только для суперпользователей)"""
+    """ViewSet для управления пользователями"""
     queryset = User.objects.all().order_by('id')
     pagination_class = UserPagination
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
+    
+    def get_permissions(self):
+        """Возвращает permissions в зависимости от действия"""
+        # Для чтения (list, retrieve) проверяем через PagePermission
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated(), HasPagePermission('users_list')]
+        # Для создания, обновления, удаления - только суперпользователи
+        return [IsAuthenticated(), IsAdminUser()]
     
     def get_serializer_class(self):
         """Возвращает сериализатор в зависимости от действия"""
@@ -150,6 +280,25 @@ class UserViewSet(viewsets.ModelViewSet):
     
     def list(self, request, *args, **kwargs):
         """Получение списка пользователей с пагинацией"""
+        # #region agent log
+        import json
+        log_path = r'r:\dev\my-tracker\my_tracker_v0.1\.cursor\debug.log'
+        try:
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'D',
+                    'location': 'views.py:UserViewSet.list',
+                    'message': 'UserViewSet.list called',
+                    'data': {
+                        'user': request.user.username,
+                        'is_superuser': request.user.is_superuser
+                    },
+                    'timestamp': int(__import__('time').time() * 1000)
+                }) + '\n')
+        except: pass
+        # #endregion
         page = self.paginate_queryset(self.queryset)
         if page is not None:
             users_data = [self._get_user_data(user) for user in page]
@@ -340,6 +489,14 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all().order_by('name')
     permission_classes = [IsAuthenticated]
     
+    def get_permissions(self):
+        """Возвращает permissions в зависимости от действия"""
+        # Для чтения (list, retrieve) проверяем через PagePermission
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated(), HasPagePermission('departments_list')]
+        # Для создания, обновления, удаления - только суперпользователи
+        return [IsAuthenticated(), IsAdminUser()]
+    
     def get_serializer_class(self):
         return None
     
@@ -361,6 +518,25 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     
     def list(self, request, *args, **kwargs):
         """Получение списка отделов"""
+        # #region agent log
+        import json
+        log_path = r'r:\dev\my-tracker\my_tracker_v0.1\.cursor\debug.log'
+        try:
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'D',
+                    'location': 'views.py:DepartmentViewSet.list',
+                    'message': 'DepartmentViewSet.list called',
+                    'data': {
+                        'user': request.user.username,
+                        'is_superuser': request.user.is_superuser
+                    },
+                    'timestamp': int(__import__('time').time() * 1000)
+                }) + '\n')
+        except: pass
+        # #endregion
         # Принудительно обновляем queryset, чтобы получить свежие данные
         departments = Department.objects.all().order_by('name')
         departments_data = [
