@@ -345,7 +345,8 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     
     def list(self, request, *args, **kwargs):
         """Получение списка отделов"""
-        departments = self.queryset
+        # Принудительно обновляем queryset, чтобы получить свежие данные
+        departments = Department.objects.all().order_by('name')
         departments_data = [
             {
                 'id': dept.id,
@@ -381,6 +382,51 @@ class DepartmentViewSet(viewsets.ModelViewSet):
                 'description': department.description,
                 'color': department.color,
             }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    def update(self, request, *args, **kwargs):
+        """Обновление отдела"""
+        department = self.get_object()
+        name = request.data.get('name')
+        description = request.data.get('description')
+        color = request.data.get('color')
+        
+        if not name:
+            return Response(
+                {'error': 'Название отдела обязательно'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            department.name = name
+            if description is not None:
+                department.description = description
+            if color is not None:
+                department.color = color
+            department.save()
+            
+            return Response({
+                'id': department.id,
+                'name': department.name,
+                'description': department.description,
+                'color': department.color,
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    def destroy(self, request, *args, **kwargs):
+        """Удаление отдела"""
+        try:
+            department = self.get_object()
+            department.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             return Response(
                 {'error': str(e)},
