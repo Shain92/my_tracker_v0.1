@@ -133,6 +133,7 @@ class UserViewSet(viewsets.ModelViewSet):
             department_data = {
                 'id': user.profile.department.id,
                 'name': user.profile.department.name,
+                'color': user.profile.department.color,
             }
         
         return {
