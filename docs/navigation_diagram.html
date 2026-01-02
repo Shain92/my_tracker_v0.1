@@ -224,6 +224,28 @@
             opacity: 0.5;
         }
 
+        .connection-arrow {
+            position: absolute;
+            color: #4fc3f7;
+            font-size: 2em;
+            z-index: 10;
+            pointer-events: none;
+            text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+        }
+
+        .connection-arrow.horizontal {
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .connection-arrow.right {
+            right: -40px;
+        }
+
+        .connection-arrow.left {
+            left: -40px;
+        }
+
         @media (max-width: 768px) {
             .page-card {
                 width: 100%;
@@ -307,6 +329,14 @@
                             <div class="element-name">_formKey</div>
                             <div class="element-desc">Ключ формы для валидации</div>
                         </div>
+                        <div class="element-item">
+                            <div class="element-name">_errorMessage</div>
+                            <div class="element-desc">Отображение ошибок входа (строки 141-147)</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">BackdropFilter</div>
+                            <div class="element-desc">Эффект стекла (glassmorphism) для формы (строки 84-85)</div>
+                        </div>
                     </div>
                     <div class="nav-arrow">→ RegisterScreen</div>
                 </div>
@@ -351,6 +381,14 @@
                         <div class="element-item">
                             <div class="element-name">AppSidebar</div>
                             <div class="element-desc">Боковое меню навигации (адаптивное)</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_HomeContent</div>
+                            <div class="element-desc">Приветственный экран с иконкой и текстом (строки 137-170)</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_loadUsername()</div>
+                            <div class="element-desc">Загрузка имени пользователя из API или локального хранилища (строки 30-48)</div>
                         </div>
                     </div>
                     <div class="nav-arrow">→ Tasks/Settings</div>
@@ -417,7 +455,7 @@
                     <div class="elements-list">
                         <div class="element-item">
                             <div class="element-name">Container</div>
-                            <div class="element-desc">Базовый контейнер с градиентным фоном</div>
+                            <div class="element-desc">Базовый контейнер с градиентным фоном (строки 10-22)</div>
                         </div>
                         <div class="element-item" style="opacity: 0.6;">
                             <div class="element-name">⚠️ Требует реализации</div>
@@ -434,14 +472,15 @@
                     <div class="page-preview">
                         <div class="preview-element highlight">Заголовок: Настройки системы</div>
                         <div class="preview-element">Секция: Управление пользователями</div>
-                        <div class="preview-element">- Список пользователей</div>
-                        <div class="preview-element">- Роли и права доступа</div>
+                        <div class="preview-element highlight">→ Список пользователей (UsersListScreen) ✓</div>
+                        <div class="preview-element">- Роли и права доступа (TODO)</div>
                         <div class="preview-element">Секция: Системные настройки</div>
-                        <div class="preview-element">- Конфигурация БД</div>
-                        <div class="preview-element">- Резервное копирование</div>
+                        <div class="preview-element">- Конфигурация БД (TODO)</div>
+                        <div class="preview-element">- Резервное копирование (TODO)</div>
                     </div>
                     <div class="file-links">
                         <a href="#" class="file-link" data-path="frontend/lib/screens/settings_screen.dart">settings_screen.dart</a>
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/users_list_screen.dart">users_list_screen.dart</a>
                     </div>
                     <div class="elements-list">
                         <div class="element-item">
@@ -452,11 +491,74 @@
                             <div class="element-name">_SettingsCard</div>
                             <div class="element-desc">Карточка настройки с описанием</div>
                         </div>
+                        <div class="element-item">
+                            <div class="element-name">Navigator.push → UsersListScreen</div>
+                            <div class="element-desc">Навигация к списку пользователей (строка 49-54)</div>
+                        </div>
                         <div class="element-item" style="opacity: 0.6;">
                             <div class="element-name">⚠️ Только для суперпользователей</div>
                             <div class="element-desc">Отображается только если is_superuser = true</div>
                         </div>
                     </div>
+                    <div class="nav-arrow">→ UsersListScreen</div>
+                </div>
+
+                <!-- Connection arrow from Settings to UsersList -->
+                <div class="connection-arrow" style="right: -40px; top: 50%; transform: translateY(-50%);">→</div>
+
+                <!-- UsersListScreen (from Settings) -->
+                <div class="page-card" data-page="users-list" style="position: relative;">
+                    <div class="page-title">
+                        <span class="page-icon">👥</span>
+                        UsersListScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">AppBar: Список пользователей</div>
+                        <div class="preview-element">Кнопка назад (Navigator.pop)</div>
+                        <div class="preview-element highlight">ListView с _UserCard</div>
+                        <div class="preview-element">- Username, Email</div>
+                        <div class="preview-element">- First/Last Name</div>
+                        <div class="preview-element">- Department (иконка)</div>
+                        <div class="preview-element">- Бейджи: Admin, Неактивен</div>
+                        <div class="preview-element highlight">Пагинация (нижняя панель)</div>
+                        <div class="preview-element">RefreshIndicator (pull-to-refresh)</div>
+                        <div class="preview-element">Состояния: Loading, Error, Empty</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/users_list_screen.dart">users_list_screen.dart</a>
+                        <a href="#" class="file-link" data-path="frontend/lib/services/api_service.dart" data-lines="200-248">api_service.dart (getUsers)</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_loadUsers({int? page})</div>
+                            <div class="element-desc">Загрузка списка через ApiService.getUsers() с пагинацией (строки 29-66)</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_refreshUsers()</div>
+                            <div class="element-desc">Обновление списка (pull-to-refresh, строка 68)</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_buildContent()</div>
+                            <div class="element-desc">Построение контента с обработкой состояний (строки 90-149)</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_buildPagination()</div>
+                            <div class="element-desc">Панель пагинации с кнопками навигации (строки 151-186)</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_UserCard</div>
+                            <div class="element-desc">Карточка пользователя: аватар, данные, бейджи (строки 189-335)</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">Состояния</div>
+                            <div class="element-desc">_isLoading, _errorMessage, _users, _currentPage, _hasNextPage</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">API Endpoint</div>
+                            <div class="element-desc">GET /api/auth/users/ (с пагинацией page, page_size)</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">← SettingsScreen (Navigator.push)</div>
                 </div>
             </div>
         </div>
@@ -494,6 +596,14 @@
                 Добавь валидацию email в RegisterScreen.
                 Файл: frontend/lib/screens/register_screen.dart
                 Элемент: _usernameController (изменить на email)
+            </div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Копировать</button>
+
+            <h3 style="margin-top: 20px; color: #4fc3f7;">Создание UsersListScreen:</h3>
+            <div class="prompt-example">
+                Создай страницу UsersListScreen для отображения списка пользователей.
+                Навигация из SettingsScreen уже настроена (settings_screen.dart строка 49-54).
+                Файл: frontend/lib/screens/users_list_screen.dart
             </div>
             <button class="copy-btn" onclick="copyPrompt(this)">Копировать</button>
         </div>
@@ -547,4 +657,5 @@
     </script>
 </body>
 </html>
+
 

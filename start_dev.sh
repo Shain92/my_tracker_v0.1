@@ -19,3 +19,4 @@ docker-compose -f docker-compose.dev.yml down
 echo "Запуск контейнеров..."
 docker-compose -f docker-compose.dev.yml up --build
 
+
