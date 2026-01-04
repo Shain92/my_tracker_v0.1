@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.html import format_html
 from django.db import connection
 from pathlib import Path
 import json
@@ -29,9 +30,24 @@ def _log(hypothesis_id, location, message, data=None):
 
 @admin.register(Status)
 class StatusAdmin(admin.ModelAdmin):
-    list_display = ['name', 'color', 'status_type', 'created_at']
+    list_display = ['name', 'color_display', 'status_type', 'created_at']
     list_filter = ['status_type', 'created_at']
     search_fields = ['name']
+    fields = ['name', 'color', 'status_type', 'created_at']
+    readonly_fields = ['created_at']
+    
+    def color_display(self, obj):
+        """Отображение цвета с визуальным индикатором"""
+        if obj.color:
+            return format_html(
+                '<span style="display: inline-block; width: 20px; height: 20px; '
+                'background-color: {}; border: 1px solid #ccc; border-radius: 3px; '
+                'vertical-align: middle; margin-right: 8px;"></span>{}',
+                obj.color,
+                obj.color
+            )
+        return '-'
+    color_display.short_description = 'Цвет'
 
 
 @admin.register(ConstructionSite)
@@ -51,11 +67,16 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectSheet)
 class ProjectSheetAdmin(admin.ModelAdmin):
-    list_display = ['name', 'project', 'status', 'is_completed', 'completed_at', 'created_at']
-    list_filter = ['status', 'is_completed', 'created_at', 'project']
+    list_display = ['name', 'project', 'status', 'responsible_department', 'is_completed', 'completed_at', 'created_at']
+    list_filter = ['status', 'is_completed', 'created_at', 'project', 'responsible_department']
     search_fields = ['name', 'description']
-    raw_id_fields = ['project', 'status']
-    filter_horizontal = ['executors']
+    raw_id_fields = ['project', 'status', 'responsible_department']
+    fields = [
+        'name', 'description', 'project', 'status', 
+        'responsible_department', 'file', 'is_completed', 
+        'completed_at', 'created_by', 'created_at', 'updated_at'
+    ]
+    readonly_fields = ['completed_at', 'created_at', 'updated_at']
 
 
 @admin.register(ProjectStage)

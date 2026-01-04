@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from apps.auth.models import Department
 
 
 class Status(models.Model):
@@ -116,6 +117,22 @@ class ProjectSheet(models.Model):
         related_name='project_sheets',
         blank=True,
         verbose_name='Исполнители'
+    )
+    responsible_department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='project_sheets',
+        verbose_name='Ответственный отдел'
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='initiated_sheets',
+        verbose_name='Инициатор'
     )
     created_at = models.DateTimeField('Создан', auto_now_add=True)
     updated_at = models.DateTimeField('Обновлен', auto_now=True)

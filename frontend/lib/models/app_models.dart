@@ -334,4 +334,226 @@ class ProjectModel {
   }
 }
 
+/// Модель статуса
+class StatusModel {
+  final int id;
+  final String name;
+  final String color;
+  final String statusType;
+  final String? createdAt;
+
+  StatusModel({
+    required this.id,
+    required this.name,
+    required this.color,
+    required this.statusType,
+    this.createdAt,
+  });
+
+  factory StatusModel.fromJson(Map<String, dynamic> json) {
+    return StatusModel(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      color: json['color'] as String,
+      statusType: json['status_type'] as String,
+      createdAt: json['created_at'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'color': color,
+      'status_type': statusType,
+      'created_at': createdAt,
+    };
+  }
+}
+
+/// Модель этапа проекта
+class ProjectStageModel {
+  final int id;
+  final int projectId;
+  final ProjectModel? project;
+  final StatusModel? status;
+  final int? statusId;
+  final DateTime datetime;
+  final UserModel? author;
+  final int? authorId;
+  final String? description;
+  final String? fileUrl;
+  final String? createdAt;
+
+  ProjectStageModel({
+    required this.id,
+    required this.projectId,
+    this.project,
+    this.status,
+    this.statusId,
+    required this.datetime,
+    this.author,
+    this.authorId,
+    this.description,
+    this.fileUrl,
+    this.createdAt,
+  });
+
+  factory ProjectStageModel.fromJson(Map<String, dynamic> json) {
+    ProjectModel? project;
+    if (json['project'] != null) {
+      project = ProjectModel.fromJson(json['project'] as Map<String, dynamic>);
+    }
+
+    StatusModel? status;
+    if (json['status'] != null) {
+      status = StatusModel.fromJson(json['status'] as Map<String, dynamic>);
+    }
+
+    UserModel? author;
+    if (json['author'] != null) {
+      author = UserModel.fromJson(json['author'] as Map<String, dynamic>);
+    }
+
+    return ProjectStageModel(
+      id: json['id'] as int,
+      projectId: json['project_id'] as int? ?? (project?.id ?? 0),
+      project: project,
+      status: status,
+      statusId: json['status_id'] as int?,
+      datetime: DateTime.parse(json['datetime'] as String),
+      author: author,
+      authorId: json['author_id'] as int?,
+      description: json['description'] as String?,
+      fileUrl: json['file_url'] as String?,
+      createdAt: json['created_at'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'project_id': projectId,
+      'project': project?.toJson(),
+      'status_id': statusId,
+      'datetime': datetime.toIso8601String(),
+      'author_id': authorId,
+      'description': description,
+      'file_url': fileUrl,
+      'created_at': createdAt,
+    };
+  }
+}
+
+/// Модель проектного листа
+class ProjectSheetModel {
+  final int id;
+  final String? name;
+  final String? description;
+  final int projectId;
+  final ProjectModel? project;
+  final StatusModel? status;
+  final int? statusId;
+  final bool isCompleted;
+  final String? completedAt;
+  final String? fileUrl;
+  final List<UserModel> executors;
+  final List<int> executorIds;
+  final DepartmentModel? responsibleDepartment;
+  final int? responsibleDepartmentId;
+  final UserModel? createdBy;
+  final int? createdById;
+  final String? createdAt;
+  final String? updatedAt;
+
+  ProjectSheetModel({
+    required this.id,
+    this.name,
+    this.description,
+    required this.projectId,
+    this.project,
+    this.status,
+    this.statusId,
+    this.isCompleted = false,
+    this.completedAt,
+    this.fileUrl,
+    this.executors = const [],
+    this.executorIds = const [],
+    this.responsibleDepartment,
+    this.responsibleDepartmentId,
+    this.createdBy,
+    this.createdById,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory ProjectSheetModel.fromJson(Map<String, dynamic> json) {
+    ProjectModel? project;
+    if (json['project'] != null) {
+      project = ProjectModel.fromJson(json['project'] as Map<String, dynamic>);
+    }
+
+    StatusModel? status;
+    if (json['status'] != null) {
+      status = StatusModel.fromJson(json['status'] as Map<String, dynamic>);
+    }
+
+    List<UserModel> executors = [];
+    if (json['executors'] != null) {
+      executors = (json['executors'] as List)
+          .map((e) => UserModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
+    UserModel? createdBy;
+    if (json['created_by'] != null) {
+      createdBy = UserModel.fromJson(json['created_by'] as Map<String, dynamic>);
+    }
+
+    DepartmentModel? responsibleDepartment;
+    if (json['responsible_department'] != null) {
+      responsibleDepartment = DepartmentModel.fromJson(json['responsible_department'] as Map<String, dynamic>);
+    }
+
+    return ProjectSheetModel(
+      id: json['id'] as int,
+      name: json['name'] as String?,
+      description: json['description'] as String?,
+      projectId: json['project_id'] as int? ?? (project?.id ?? 0),
+      project: project,
+      status: status,
+      statusId: json['status_id'] as int?,
+      isCompleted: json['is_completed'] as bool? ?? false,
+      completedAt: json['completed_at'] as String?,
+      fileUrl: json['file_url'] as String?,
+      executors: executors,
+      executorIds: (json['executor_ids'] as List?)?.map((e) => e as int).toList() ?? [],
+      responsibleDepartment: responsibleDepartment,
+      responsibleDepartmentId: json['responsible_department_id'] as int?,
+      createdBy: createdBy,
+      createdById: json['created_by_id'] as int?,
+      createdAt: json['created_at'] as String?,
+      updatedAt: json['updated_at'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'project_id': projectId,
+      'status_id': statusId,
+      'is_completed': isCompleted,
+      'completed_at': completedAt,
+      'file_url': fileUrl,
+      'executor_ids': executorIds,
+      'responsible_department_id': responsibleDepartmentId,
+      'created_by_id': createdById,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+    };
+  }
+}
+
 

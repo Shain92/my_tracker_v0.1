@@ -3,6 +3,7 @@ import traceback
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.utils import timezone
+from apps.auth.models import Department
 from .models import (
     Status, ConstructionSite, Project, ProjectSheet,
     ProjectStage, ProjectSheetNote
@@ -48,6 +49,13 @@ class StatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Status
         fields = ['id', 'name', 'color', 'status_type', 'created_at']
+
+
+class DepartmentSerializer(serializers.ModelSerializer):
+    """Сериализатор отдела"""
+    class Meta:
+        model = Department
+        fields = ['id', 'name', 'description', 'color']
 
 
 class ConstructionSiteSerializer(serializers.ModelSerializer):
@@ -132,6 +140,23 @@ class ProjectSheetSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
+    responsible_department = DepartmentSerializer(read_only=True)
+    responsible_department_id = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.all(),
+        source='responsible_department',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+    created_by = UserSerializer(read_only=True)
+    created_by_id = serializers.SerializerMethodField()
+    created_by_id_write = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='created_by',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
     file_url = serializers.SerializerMethodField()
     
     class Meta:
@@ -140,9 +165,14 @@ class ProjectSheetSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'project', 'project_id',
             'status', 'status_id', 'is_completed', 'completed_at',
             'file', 'file_url', 'executors', 'executor_ids',
-            'created_at', 'updated_at'
+            'responsible_department', 'responsible_department_id',
+            'created_by', 'created_by_id', 'created_by_id_write', 'created_at', 'updated_at'
         ]
         read_only_fields = ['completed_at']
+    
+    def get_created_by_id(self, obj):
+        """Возвращает ID инициатора"""
+        return obj.created_by.id if obj.created_by else None
     
     def get_file_url(self, obj):
         """Возвращает URL файла"""

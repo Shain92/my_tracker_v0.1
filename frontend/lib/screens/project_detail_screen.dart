@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/app_models.dart';
+import '../services/api_service.dart';
+import '../widgets/project_stage_form_dialog.dart';
+import '../widgets/project_sheet_form_dialog.dart';
 
 /// Экран деталей проекта
-class ProjectDetailScreen extends StatelessWidget {
+class ProjectDetailScreen extends StatefulWidget {
   final ProjectModel project;
 
   const ProjectDetailScreen({
@@ -12,7 +15,83 @@ class ProjectDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<ProjectDetailScreen> createState() => _ProjectDetailScreenState();
+}
+
+class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
+  List<ProjectStageModel> _stages = [];
+  List<ProjectSheetModel> _sheets = [];
+  bool _isLoading = true;
+  int? _currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUser();
+    _loadData();
+  }
+
+  /// Загрузка текущего пользователя
+  Future<void> _loadCurrentUser() async {
+    final user = await ApiService.getCurrentUser();
+    if (user != null && mounted) {
+      setState(() {
+        _currentUserId = user['id'] as int?;
+      });
+    }
+  }
+
+  /// Загрузка данных
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    await Future.wait([
+      _loadStages(),
+      _loadSheets(),
+    ]);
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Загрузка этапов
+  Future<void> _loadStages() async {
+    final result = await ApiService.getProjectStages(widget.project.id);
+    if (mounted && result['success'] == true) {
+      setState(() {
+        _stages = (result['data'] as List)
+            .map((s) => ProjectStageModel.fromJson(s as Map<String, dynamic>))
+            .toList();
+      });
+    }
+  }
+
+  /// Загрузка листов
+  Future<void> _loadSheets() async {
+    final result = await ApiService.getProjectSheets(widget.project.id);
+    if (mounted && result['success'] == true) {
+      setState(() {
+        _sheets = (result['data'] as List)
+            .map((s) => ProjectSheetModel.fromJson(s as Map<String, dynamic>))
+            .toList();
+      });
+    }
+  }
+
+  /// Обновление данных
+  void _refreshData() {
+    _loadData();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -29,9 +108,11 @@ class ProjectDetailScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              _buildHeader(context),
+              _buildHeader(context, isMobile),
               Expanded(
-                child: _buildContent(),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildContent(isMobile),
               ),
             ],
           ),
@@ -41,9 +122,7 @@ class ProjectDetailScreen extends StatelessWidget {
   }
 
   /// Заголовок
-  Widget _buildHeader(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    
+  Widget _buildHeader(BuildContext context, bool isMobile) {
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
@@ -74,7 +153,7 @@ class ProjectDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  project.name,
+                  widget.project.name,
                   style: TextStyle(
                     fontSize: isMobile ? 18 : 24,
                     fontWeight: FontWeight.bold,
@@ -83,11 +162,11 @@ class ProjectDetailScreen extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (!isMobile && project.code.isNotEmpty) ...[
+                if (!isMobile && widget.project.code.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'Код: ${project.code}',
-                    style: TextStyle(
+                    'Код: ${widget.project.code}',
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
@@ -103,27 +182,716 @@ class ProjectDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildContent() {
-    return Center(
+  /// Основной контент
+  Widget _buildContent(bool isMobile) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            Icons.folder_outlined,
-            size: 64,
-            color: AppColors.textSecondary,
+          _buildProjectInfo(isMobile),
+          const SizedBox(height: 24),
+          isMobile
+              ? _buildMobileLayout()
+              : _buildDesktopLayout(),
+        ],
+      ),
+    );
+  }
+
+  /// Информация о проекте
+  Widget _buildProjectInfo(bool isMobile) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.info_outline,
+                color: AppColors.accentBlue,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Информация о проекте',
+                style: TextStyle(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          Text(
-            'Страница проекта',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 16,
+          _buildInfoRow('Код', widget.project.code, Icons.tag),
+          if (widget.project.cipher.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow('Шифр', widget.project.cipher, Icons.code),
+          ],
+          if (widget.project.constructionSite != null) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow(
+              'Участок',
+              widget.project.constructionSite!.name,
+              Icons.construction,
             ),
+          ],
+          const SizedBox(height: 12),
+          // Процент выполнения
+          Row(
+            children: [
+              const Icon(
+                Icons.trending_up,
+                color: AppColors.accentGreen,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Выполнение: ',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                '${widget.project.completionPercentage?.toStringAsFixed(1) ?? 0.0}%',
+                style: const TextStyle(
+                  color: AppColors.accentGreen,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: (widget.project.completionPercentage ?? 0.0) / 100,
+            backgroundColor: AppColors.backgroundSecondary,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentGreen),
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
           ),
         ],
       ),
     );
   }
-}
 
+  /// Строка информации
+  Widget _buildInfoRow(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.textSecondary, size: 18),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Раскладка для мобильных устройств
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        _buildStagesColumn(true),
+        const SizedBox(height: 24),
+        _buildSheetsColumn(true),
+      ],
+    );
+  }
+
+  /// Раскладка для десктопа
+  Widget _buildDesktopLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _buildStagesColumn(false)),
+        const SizedBox(width: 16),
+        Expanded(child: _buildSheetsColumn(false)),
+      ],
+    );
+  }
+
+  /// Колонка этапов
+  Widget _buildStagesColumn(bool isMobile) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.timeline,
+                  color: AppColors.accentBlue,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Этапы проекта',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                FloatingActionButton.small(
+                  onPressed: () => _showStageDialog(null),
+                  backgroundColor: AppColors.accentBlue,
+                  child: const Icon(Icons.add),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: _stages.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Text(
+                        'Нет этапов',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.all(8),
+                    itemCount: _stages.length,
+                    itemBuilder: (context, index) {
+                      return _buildStageCard(_stages[index], isMobile);
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Колонка листов
+  Widget _buildSheetsColumn(bool isMobile) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.description,
+                  color: AppColors.accentGreen,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Проектные листы',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                FloatingActionButton.small(
+                  onPressed: () => _showSheetDialog(null),
+                  backgroundColor: AppColors.accentGreen,
+                  child: const Icon(Icons.add),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: _sheets.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Text(
+                        'Нет листов',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.all(8),
+                    itemCount: _sheets.length,
+                    itemBuilder: (context, index) {
+                      return _buildSheetCard(_sheets[index], isMobile);
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Карточка этапа
+  Widget _buildStageCard(ProjectStageModel stage, bool isMobile) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      color: AppColors.cardBackground,
+      child: InkWell(
+        onTap: () => _showStageDialog(stage),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (stage.status != null) ...[
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _parseColor(stage.status!.color),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: Text(
+                      '${stage.datetime.day.toString().padLeft(2, '0')}.${stage.datetime.month.toString().padLeft(2, '0')}.${stage.datetime.year} ${stage.datetime.hour.toString().padLeft(2, '0')}:${stage.datetime.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 18),
+                    color: AppColors.accentPink,
+                    onPressed: () => _deleteStage(stage),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              if (stage.description != null && stage.description!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  stage.description!,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (stage.author != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.person,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      stage.author!.username,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Карточка листа
+  Widget _buildSheetCard(ProjectSheetModel sheet, bool isMobile) {
+    final canToggleCompleted = _currentUserId != null &&
+        sheet.createdById != null &&
+        _currentUserId == sheet.createdById;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      color: AppColors.cardBackground,
+      child: InkWell(
+        onTap: () => _showSheetDialog(sheet),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Checkbox(
+                    value: sheet.isCompleted,
+                    onChanged: canToggleCompleted
+                        ? (value) => _toggleSheetCompleted(sheet, value ?? false)
+                        : null,
+                    activeColor: AppColors.accentGreen,
+                  ),
+                  if (sheet.status != null) ...[
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _parseColor(sheet.status!.color),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: Text(
+                      sheet.name ?? 'Без названия',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        decoration: sheet.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 18),
+                    color: AppColors.accentPink,
+                    onPressed: () => _deleteSheet(sheet),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              if (sheet.description != null && sheet.description!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  sheet.description!,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (sheet.responsibleDepartment != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _parseColor(sheet.responsibleDepartment!.color),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      sheet.responsibleDepartment!.name,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (sheet.fileUrl != null && sheet.fileUrl!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () => _downloadFile(sheet),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.download,
+                        size: 16,
+                        color: AppColors.accentBlue,
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Скачать файл',
+                        style: TextStyle(
+                          color: AppColors.accentBlue,
+                          fontSize: 12,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Показать диалог этапа
+  Future<void> _showStageDialog(ProjectStageModel? stage) async {
+    final result = await showDialog(
+      context: context,
+      builder: (context) => ProjectStageFormDialog(
+        stage: stage,
+        project: widget.project,
+        onRefresh: _refreshData,
+      ),
+    );
+
+    if (result != null && result['success'] == true) {
+      _refreshData();
+    }
+  }
+
+  /// Показать диалог листа
+  Future<void> _showSheetDialog(ProjectSheetModel? sheet) async {
+    final result = await showDialog(
+      context: context,
+      builder: (context) => ProjectSheetFormDialog(
+        sheet: sheet,
+        project: widget.project,
+        onRefresh: _refreshData,
+      ),
+    );
+
+    if (result != null && result['success'] == true) {
+      _refreshData();
+    }
+  }
+
+  /// Удаление этапа
+  Future<void> _deleteStage(ProjectStageModel stage) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: const Text(
+          'Удаление этапа',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          'Вы уверены, что хотите удалить этот этап?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accentPink,
+            ),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final result = await ApiService.deleteProjectStage(stage.id);
+      if (result['success'] == true) {
+        _refreshData();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Этап удален'),
+              backgroundColor: AppColors.accentGreen,
+            ),
+          );
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Ошибка удаления'),
+              backgroundColor: AppColors.accentPink,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  /// Удаление листа
+  Future<void> _deleteSheet(ProjectSheetModel sheet) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: const Text(
+          'Удаление листа',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          'Вы уверены, что хотите удалить этот лист?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accentPink,
+            ),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final result = await ApiService.deleteProjectSheet(sheet.id);
+      if (result['success'] == true) {
+        _refreshData();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Лист удален'),
+              backgroundColor: AppColors.accentGreen,
+            ),
+          );
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Ошибка удаления'),
+              backgroundColor: AppColors.accentPink,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  /// Переключение статуса выполнения листа
+  Future<void> _toggleSheetCompleted(ProjectSheetModel sheet, bool value) async {
+    final result = await ApiService.toggleProjectSheetCompleted(sheet.id, value);
+    if (result['success'] == true) {
+      _refreshData();
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Ошибка обновления'),
+            backgroundColor: AppColors.accentPink,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Скачивание файла проектного листа
+  Future<void> _downloadFile(ProjectSheetModel sheet) async {
+    if (sheet.fileUrl == null || sheet.fileUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Файл не прикреплен'),
+          backgroundColor: AppColors.accentPink,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final result = await ApiService.downloadProjectSheetFile(sheet.id);
+      if (result['success'] == true) {
+        // Для веб-приложения открываем файл в новой вкладке
+        // Для мобильных приложений можно сохранить файл
+        if (sheet.fileUrl != null) {
+          // Используем url_launcher или другой механизм для открытия/скачивания
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Файл готов к скачиванию'),
+              backgroundColor: AppColors.accentGreen,
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Ошибка скачивания файла'),
+            backgroundColor: AppColors.accentPink,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка: ${e.toString()}'),
+          backgroundColor: AppColors.accentPink,
+        ),
+      );
+    }
+  }
+
+  /// Парсинг цвета из HEX строки
+  Color _parseColor(String hexColor) {
+    try {
+      return Color(int.parse(hexColor.replaceAll('#', '0xFF')));
+    } catch (e) {
+      return AppColors.textSecondary;
+    }
+  }
+}

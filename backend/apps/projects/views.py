@@ -1,10 +1,12 @@
 import json
 import traceback
+import os
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q, Count, F
 from django.utils import timezone
+from django.http import FileResponse, Http404
 from datetime import datetime, timedelta
 from django.contrib.auth.models import User
 
@@ -177,6 +179,51 @@ class ProjectSheetViewSet(viewsets.ModelViewSet):
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         return queryset
+    
+    def perform_create(self, serializer):
+        """Автоматически устанавливает created_by при создании"""
+        serializer.save(created_by=self.request.user)
+    
+    def perform_update(self, serializer):
+        """Проверка прав на изменение is_completed"""
+        instance = self.get_object()
+        # Если пытаются изменить is_completed, проверяем права
+        if 'is_completed' in serializer.validated_data:
+            if instance.created_by and instance.created_by != self.request.user:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Только инициатор листа может изменить статус выполнения")
+        serializer.save()
+    
+    @action(detail=True, methods=['get'])
+    def download_file(self, request, pk=None):
+        """Скачивание файла проектного листа"""
+        sheet = self.get_object()
+        if not sheet.file:
+            return Response(
+                {'error': 'Файл не прикреплен'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            file_path = sheet.file.path
+            if not os.path.exists(file_path):
+                return Response(
+                    {'error': 'Файл не найден на сервере'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            file_handle = open(file_path, 'rb')
+            response = FileResponse(
+                file_handle,
+                content_type='application/octet-stream'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
+            return response
+        except Exception as e:
+            return Response(
+                {'error': f'Ошибка при скачивании файла: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class ProjectStageViewSet(viewsets.ModelViewSet):

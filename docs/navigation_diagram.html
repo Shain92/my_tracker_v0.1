@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Блок-схема навигации My Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4fc3f7;
+            font-size: 2.5em;
+            text-shadow: 0 0 20px rgba(79, 195, 247, 0.5);
+        }
+
+        .description {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(79, 195, 247, 0.3);
+        }
+
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .flow-row {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .page-card {
+            background: rgba(30, 30, 50, 0.8);
+            border: 2px solid rgba(79, 195, 247, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            width: 320px;
+            min-height: 400px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page-card:hover {
+            transform: translateY(-5px);
+            border-color: #4fc3f7;
+            box-shadow: 0 10px 30px rgba(79, 195, 247, 0.3);
+        }
+
+        .page-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #4fc3f7, #29b6f6, #03a9f4);
+        }
+
+        .page-title {
+            font-size: 1.5em;
+            color: #4fc3f7;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .page-icon {
+            font-size: 1.2em;
+        }
+
+        .page-preview {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            min-height: 200px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .preview-element {
+            background: rgba(79, 195, 247, 0.1);
+            border: 1px solid rgba(79, 195, 247, 0.3);
+            border-radius: 5px;
+            padding: 8px;
+            margin: 5px 0;
+            font-size: 0.85em;
+            color: #b0bec5;
+        }
+
+        .preview-element.highlight {
+            background: rgba(79, 195, 247, 0.2);
+            border-color: #4fc3f7;
+        }
+
+        .file-links {
+            margin-top: 15px;
+        }
+
+        .file-link {
+            display: block;
+            background: rgba(79, 195, 247, 0.1);
+            border: 1px solid rgba(79, 195, 247, 0.3);
+            border-radius: 5px;
+            padding: 10px;
+            margin: 8px 0;
+            text-decoration: none;
+            color: #81d4fa;
+            transition: all 0.2s;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+
+        .file-link:hover {
+            background: rgba(79, 195, 247, 0.2);
+            border-color: #4fc3f7;
+            transform: translateX(5px);
+        }
+
+        .file-link::before {
+            content: '📄 ';
+        }
+
+        .elements-list {
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .element-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 3px solid #4fc3f7;
+        }
+
+        .element-name {
+            color: #81d4fa;
+            font-weight: bold;
+        }
+
+        .element-desc {
+            color: #b0bec5;
+            font-size: 0.85em;
+            margin-top: 3px;
+        }
+
+        .arrow {
+            text-align: center;
+            font-size: 2em;
+            color: #4fc3f7;
+            margin: 10px 0;
+        }
+
+        .prompt-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+            border: 1px solid rgba(79, 195, 247, 0.3);
+        }
+
+        .prompt-example {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #4fc3f7;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #b0bec5;
+        }
+
+        .copy-btn {
+            background: #4fc3f7;
+            color: #1a1a2e;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: #29b6f6;
+            transform: scale(1.05);
+        }
+
+        .nav-arrow {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #4fc3f7;
+            font-size: 1.2em;
+            opacity: 0.5;
+        }
+
+        .connection-arrow {
+            position: absolute;
+            color: #4fc3f7;
+            font-size: 2em;
+            z-index: 10;
+            pointer-events: none;
+            text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            .page-card {
+                width: 100%;
+            }
+            .connection-arrow {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Блок-схема навигации My Tracker</h1>
+        
+        <div class="description">
+            <h3>📋 Описание документа</h3>
+            <p>Интерактивная блок-схема навигации приложения с мини-превью страниц, ссылками на файлы и элементами для использования в промптах.</p>
+            <p><strong>Использование:</strong> Наведите на карточку страницы, чтобы увидеть детали. Кликните на ссылку файла, чтобы скопировать путь для промпта.</p>
+        </div>
+
+        <div class="flow-diagram">
+            <!-- AuthWrapper -->
+            <div class="flow-row">
+                <div class="page-card" data-page="auth">
+                    <div class="page-title">
+                        <span class="page-icon">🔐</span>
+                        AuthWrapper
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Проверка токена</div>
+                        <div class="preview-element">ApiService.getAccessToken()</div>
+                        <div class="preview-element">Условная навигация</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/main.dart" data-lines="26-63">main.dart (26-63)</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_checkAuth()</div>
+                            <div class="element-desc">Проверка наличия токена авторизации</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_isAuthenticated</div>
+                            <div class="element-desc">Состояние авторизации пользователя</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">↓</div>
+                </div>
+            </div>
+
+            <div class="arrow">↓</div>
+
+            <!-- Login & Home -->
+            <div class="flow-row">
+                <div class="page-card" data-page="login">
+                    <div class="page-title">
+                        <span class="page-icon">🔑</span>
+                        LoginScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Логотип "Logic"</div>
+                        <div class="preview-element">Поле: Username</div>
+                        <div class="preview-element">Поле: Password</div>
+                        <div class="preview-element">Кнопка: Войти</div>
+                        <div class="preview-element">Ссылка: Регистрация</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/login_screen.dart">login_screen.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_usernameController</div>
+                            <div class="element-desc">Контроллер поля username</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_passwordController</div>
+                            <div class="element-desc">Контроллер поля password</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_handleLogin()</div>
+                            <div class="element-desc">Обработка входа через ApiService.login()</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_formKey</div>
+                            <div class="element-desc">Ключ формы для валидации</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_errorMessage</div>
+                            <div class="element-desc">Отображение ошибок входа</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">→ RegisterScreen</div>
+                </div>
+
+                <div class="page-card" data-page="home">
+                    <div class="page-title">
+                        <span class="page-icon">🏠</span>
+                        HomeScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">GlassHeader</div>
+                        <div class="preview-element">AppSidebar</div>
+                        <div class="preview-element">HomeContent / TasksScreen / ProjectsListScreen / SettingsScreen</div>
+                        <div class="preview-element">Кнопка выхода</div>
+                        <div class="preview-element">Проверка прав доступа</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/home_screen.dart">home_screen.dart</a>
+                        <a href="#" class="file-link" data-path="frontend/lib/widgets/glass_header.dart">glass_header.dart</a>
+                        <a href="#" class="file-link" data-path="frontend/lib/widgets/app_sidebar.dart">app_sidebar.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_selectedScreen</div>
+                            <div class="element-desc">Текущий выбранный экран (home/tasks/projects/settings)</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_buildCurrentScreen()</div>
+                            <div class="element-desc">Отображение текущего экрана</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_onMenuItemSelected()</div>
+                            <div class="element-desc">Обработка выбора пункта меню с проверкой прав</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_loadUserData()</div>
+                            <div class="element-desc">Загрузка данных пользователя и прав доступа</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_allowedPages</div>
+                            <div class="element-desc">Набор разрешенных страниц для пользователя</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">→ Tasks/Projects/Settings</div>
+                </div>
+            </div>
+
+            <div class="arrow">↓</div>
+
+            <!-- Register -->
+            <div class="flow-row">
+                <div class="page-card" data-page="register">
+                    <div class="page-title">
+                        <span class="page-icon">📝</span>
+                        RegisterScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Заголовок: Регистрация</div>
+                        <div class="preview-element">Поле: Username</div>
+                        <div class="preview-element">Поле: Password</div>
+                        <div class="preview-element">Поле: Confirm Password</div>
+                        <div class="preview-element">Кнопка: Зарегистрироваться</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/register_screen.dart">register_screen.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_usernameController</div>
+                            <div class="element-desc">Контроллер поля username</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_passwordController</div>
+                            <div class="element-desc">Контроллер поля password</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_confirmPasswordController</div>
+                            <div class="element-desc">Контроллер подтверждения пароля</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_handleRegister()</div>
+                            <div class="element-desc">Обработка регистрации через ApiService.register()</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">→ HomeScreen</div>
+                </div>
+            </div>
+
+            <div class="arrow">↓</div>
+
+            <!-- Tasks, Projects & Settings -->
+            <div class="flow-row">
+                <div class="page-card" data-page="tasks">
+                    <div class="page-title">
+                        <span class="page-icon">✅</span>
+                        TasksScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Градиентный фон</div>
+                        <div class="preview-element" style="opacity: 0.5;">TODO: Функционал задач</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/tasks_screen.dart">tasks_screen.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">Container</div>
+                            <div class="element-desc">Базовый контейнер с градиентным фоном</div>
+                        </div>
+                        <div class="element-item" style="opacity: 0.6;">
+                            <div class="element-name">⚠️ Требует реализации</div>
+                            <div class="element-desc">Функционал управления задачами не реализован</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="page-card" data-page="projects">
+                    <div class="page-title">
+                        <span class="page-icon">📁</span>
+                        ProjectsListScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Заголовок: Проекты</div>
+                        <div class="preview-element">Grid с секциями:</div>
+                        <div class="preview-element highlight">→ ИД (ProjectIdScreen)</div>
+                        <div class="preview-element highlight">→ Материалы (ProjectMaterialsScreen)</div>
+                        <div class="preview-element highlight">→ Работы (ProjectWorksScreen)</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/projects_list_screen.dart">projects_list_screen.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_SectionCard</div>
+                            <div class="element-desc">Карточка секции проекта с навигацией</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">Navigator.push</div>
+                            <div class="element-desc">Навигация к ProjectIdScreen, ProjectMaterialsScreen, ProjectWorksScreen</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">→ ИД/Материалы/Работы</div>
+                </div>
+
+                <div class="page-card" data-page="settings">
+                    <div class="page-title">
+                        <span class="page-icon">⚙️</span>
+                        SettingsScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Заголовок: Настройки системы</div>
+                        <div class="preview-element">Секция: Управление пользователями</div>
+                        <div class="preview-element highlight">→ Список пользователей (UsersListScreen) ✓</div>
+                        <div class="preview-element highlight">→ Отделы (DepartmentsListScreen) ✓</div>
+                        <div class="preview-element">Секция: Системные настройки</div>
+                        <div class="preview-element">- Конфигурация БД (TODO)</div>
+                        <div class="preview-element">- Резервное копирование (TODO)</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/settings_screen.dart">settings_screen.dart</a>
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/users_list_screen.dart">users_list_screen.dart</a>
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/departments_list_screen.dart">departments_list_screen.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_SettingsSection</div>
+                            <div class="element-desc">Секция настроек с заголовком</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_SettingsCard</div>
+                            <div class="element-desc">Карточка настройки с описанием</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_hasAccess()</div>
+                            <div class="element-desc">Проверка прав доступа к страницам</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">Navigator.push</div>
+                            <div class="element-desc">Навигация к UsersListScreen, DepartmentsListScreen</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">→ Users/Departments</div>
+                </div>
+            </div>
+
+            <div class="arrow">↓</div>
+
+            <!-- Project Screens -->
+            <div class="flow-row">
+                <div class="page-card" data-page="project-id">
+                    <div class="page-title">
+                        <span class="page-icon">📋</span>
+                        ProjectIdScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Список строительных участков</div>
+                        <div class="preview-element">Карточки участков</div>
+                        <div class="preview-element highlight">→ SiteProjectsScreen</div>
+                        <div class="preview-element">ConstructionSiteFormDialog</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/project_id_screen.dart">project_id_screen.dart</a>
+                        <a href="#" class="file-link" data-path="frontend/lib/widgets/construction_site_form_dialog.dart">construction_site_form_dialog.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_loadConstructionSites()</div>
+                            <div class="element-desc">Загрузка списка участков через ApiService</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">Navigator.push → SiteProjectsScreen</div>
+                            <div class="element-desc">Навигация к проектам участка</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">→ SiteProjectsScreen</div>
+                </div>
+
+                <div class="page-card" data-page="project-materials">
+                    <div class="page-title">
+                        <span class="page-icon">📦</span>
+                        ProjectMaterialsScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Список материалов</div>
+                        <div class="preview-element">CRUD операции</div>
+                        <div class="preview-element">Фильтрация и поиск</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/project_materials_screen.dart">project_materials_screen.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">Загрузка материалов</div>
+                            <div class="element-desc">Через ApiService.getMaterials()</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="page-card" data-page="project-works">
+                    <div class="page-title">
+                        <span class="page-icon">🔧</span>
+                        ProjectWorksScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Список работ</div>
+                        <div class="preview-element">CRUD операции</div>
+                        <div class="preview-element">Фильтрация и поиск</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/project_works_screen.dart">project_works_screen.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">Загрузка работ</div>
+                            <div class="element-desc">Через ApiService.getWorks()</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow">↓</div>
+
+            <!-- Settings Screens -->
+            <div class="flow-row">
+                <div class="page-card" data-page="users-list">
+                    <div class="page-title">
+                        <span class="page-icon">👥</span>
+                        UsersListScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">AppBar: Список пользователей</div>
+                        <div class="preview-element">ListView с _UserCard</div>
+                        <div class="preview-element">- Username, Email, Department</div>
+                        <div class="preview-element">- Бейджи: Admin, Неактивен</div>
+                        <div class="preview-element highlight">Пагинация</div>
+                        <div class="preview-element">RefreshIndicator</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/users_list_screen.dart">users_list_screen.dart</a>
+                        <a href="#" class="file-link" data-path="frontend/lib/services/api_service.dart" data-lines="200-248">api_service.dart (getUsers)</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_loadUsers()</div>
+                            <div class="element-desc">Загрузка списка через ApiService.getUsers()</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_UserCard</div>
+                            <div class="element-desc">Карточка пользователя с данными</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">_buildPagination()</div>
+                            <div class="element-desc">Панель пагинации</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">← SettingsScreen</div>
+                </div>
+
+                <div class="page-card" data-page="departments-list">
+                    <div class="page-title">
+                        <span class="page-icon">🏢</span>
+                        DepartmentsListScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Список отделов</div>
+                        <div class="preview-element">Кнопка: Добавить отдел</div>
+                        <div class="preview-element highlight">→ AccessPermissionsScreen</div>
+                        <div class="preview-element">DepartmentFormDialog</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/departments_list_screen.dart">departments_list_screen.dart</a>
+                        <a href="#" class="file-link" data-path="frontend/lib/widgets/department_form_dialog.dart">department_form_dialog.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">_loadDepartments()</div>
+                            <div class="element-desc">Загрузка списка через ApiService.getDepartments()</div>
+                        </div>
+                        <div class="element-item">
+                            <div class="element-name">Navigator.push → AccessPermissionsScreen</div>
+                            <div class="element-desc">Навигация к настройкам доступа</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">← SettingsScreen → AccessPermissions</div>
+                </div>
+
+                <div class="page-card" data-page="site-projects">
+                    <div class="page-title">
+                        <span class="page-icon">🏗️</span>
+                        SiteProjectsScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Проекты участка</div>
+                        <div class="preview-element">Список проектов</div>
+                        <div class="preview-element">Детали проекта</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/site_projects_screen.dart">site_projects_screen.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">Загрузка проектов участка</div>
+                            <div class="element-desc">Через ApiService с параметром constructionSite</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">← ProjectIdScreen</div>
+                </div>
+            </div>
+
+            <div class="arrow">↓</div>
+
+            <!-- Access Permissions -->
+            <div class="flow-row">
+                <div class="page-card" data-page="access-permissions">
+                    <div class="page-title">
+                        <span class="page-icon">🔒</span>
+                        AccessPermissionsScreen
+                    </div>
+                    <div class="page-preview">
+                        <div class="preview-element highlight">Настройки доступа</div>
+                        <div class="preview-element">Управление правами отделов</div>
+                        <div class="preview-element">Настройка страниц доступа</div>
+                    </div>
+                    <div class="file-links">
+                        <a href="#" class="file-link" data-path="frontend/lib/screens/access_permissions_screen.dart">access_permissions_screen.dart</a>
+                    </div>
+                    <div class="elements-list">
+                        <div class="element-item">
+                            <div class="element-name">Управление правами</div>
+                            <div class="element-desc">Настройка доступа отделов к страницам</div>
+                        </div>
+                    </div>
+                    <div class="nav-arrow">← DepartmentsListScreen</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prompt Examples Section -->
+        <div class="prompt-section">
+            <h2>📝 Примеры промптов для использования</h2>
+            
+            <h3 style="margin-top: 20px; color: #4fc3f7;">Добавление новой страницы:</h3>
+            <div class="prompt-example">
+                Создай новую страницу ReportsScreen по аналогии с ProjectsListScreen.
+                Добавь навигацию к ней из HomeScreen через AppSidebar.
+                Файл: frontend/lib/screens/reports_screen.dart
+            </div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Копировать</button>
+
+            <h3 style="margin-top: 20px; color: #4fc3f7;">Модификация навигации:</h3>
+            <div class="prompt-example">
+                Измени HomeScreen чтобы добавить новую страницу ReportsScreen.
+                Добавь пункт меню в AppSidebar и обработку в _buildCurrentScreen().
+                Ссылки: frontend/lib/screens/home_screen.dart, frontend/lib/widgets/app_sidebar.dart
+            </div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Копировать</button>
+
+            <h3 style="margin-top: 20px; color: #4fc3f7;">Работа с API:</h3>
+            <div class="prompt-example">
+                Реализуй загрузку задач в TasksScreen используя ApiService.
+                Ссылка на API сервис: frontend/lib/services/api_service.dart
+                Ссылка на экран: frontend/lib/screens/tasks_screen.dart
+            </div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Копировать</button>
+
+            <h3 style="margin-top: 20px; color: #4fc3f7;">Работа с правами доступа:</h3>
+            <div class="prompt-example">
+                Добавь проверку прав доступа для новой страницы ReportsScreen.
+                Используй _allowedPages и _hasAccess() из HomeScreen.
+                Файл: frontend/lib/screens/home_screen.dart
+            </div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Копировать</button>
+        </div>
+    </div>
+
+    <script>
+        // Копирование пути файла при клике
+        document.querySelectorAll('.file-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const path = this.getAttribute('data-path');
+                const lines = this.getAttribute('data-lines');
+                let textToCopy = path;
+                if (lines) {
+                    textToCopy = `${path} (${lines})`;
+                }
+                
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const originalText = this.textContent;
+                    this.textContent = '✓ Скопировано!';
+                    this.style.background = 'rgba(76, 175, 80, 0.3)';
+                    setTimeout(() => {
+                        this.textContent = originalText;
+                        this.style.background = '';
+                    }, 2000);
+                });
+            });
+        });
+
+        // Копирование примера промпта
+        function copyPrompt(btn) {
+            const promptText = btn.previousElementSibling.textContent.trim();
+            navigator.clipboard.writeText(promptText).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Скопировано!';
+                btn.style.background = '#4caf50';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
+
