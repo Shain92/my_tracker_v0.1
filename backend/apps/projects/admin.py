@@ -81,10 +81,16 @@ class ProjectSheetAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectStage)
 class ProjectStageAdmin(admin.ModelAdmin):
+    """Админка этапа проекта с автодополнением для связей"""
     list_display = ['project', 'status', 'datetime', 'author', 'created_at']
     list_filter = ['status', 'datetime', 'created_at', 'project']
     search_fields = ['description']
-    raw_id_fields = ['project', 'status', 'author']
+    autocomplete_fields = ['project', 'status', 'author']
+    fields = [
+        'project', 'status', 'datetime', 'author',
+        'description', 'file', 'created_at'
+    ]
+    readonly_fields = ['created_at']
 
 
 @admin.register(ProjectSheetNote)

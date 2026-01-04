@@ -89,8 +89,14 @@ class StatusViewSet(viewsets.ModelViewSet):
                 _log('A', 'StatusViewSet.list:table_error', 'Table check failed', {'error': str(table_error)})
             # #endregion
             queryset = self.get_queryset()
+            
+            # Фильтрация по status_type
+            status_type = request.query_params.get('status_type')
+            if status_type:
+                queryset = queryset.filter(status_type=status_type)
+            
             # #region agent log
-            _log('A', 'StatusViewSet.list:after_query', 'After querying', {'count': queryset.count()})
+            _log('A', 'StatusViewSet.list:after_query', 'After querying', {'count': queryset.count(), 'status_type': status_type})
             # #endregion
             serializer = self.get_serializer(queryset, many=True)
             # #region agent log

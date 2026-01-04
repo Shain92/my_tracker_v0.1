@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/app_models.dart';
@@ -34,6 +35,8 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
   bool _isLoadingStatuses = true;
   bool _isLoadingDepartments = true;
   int? _currentUserId;
+  PlatformFile? _selectedFile;
+  bool _deleteFile = false;
 
   @override
   void initState() {
@@ -41,7 +44,7 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
     if (widget.sheet != null) {
       _nameController.text = widget.sheet!.name ?? '';
       _descriptionController.text = widget.sheet!.description ?? '';
-      _selectedDepartment = widget.sheet!.responsibleDepartment;
+      // НЕ устанавливаем _selectedDepartment здесь - он будет установлен после загрузки отделов
       _isCompleted = widget.sheet!.isCompleted;
     }
     _loadCurrentUser();
@@ -75,21 +78,61 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
             .map((s) => StatusModel.fromJson(s as Map<String, dynamic>))
             .toList();
         _isLoadingStatuses = false;
-        // Устанавливаем выбранный статус только после загрузки списка
-        if (widget.sheet?.statusId != null && _statuses.isNotEmpty) {
+        
+        // Устанавливаем выбранный статус после загрузки списка
+        if (widget.sheet != null && widget.sheet!.statusId != null) {
           try {
+            // Ищем статус в загруженном списке по id
             _selectedStatus = _statuses.firstWhere(
               (s) => s.id == widget.sheet!.statusId,
             );
           } catch (e) {
-            // Если статус не найден, оставляем null
-            _selectedStatus = null;
+            // Если статус не найден в списке, но есть в объекте sheet,
+            // добавляем его в список и используем
+            if (widget.sheet!.status != null) {
+              // Проверяем, нет ли уже такого статуса в списке
+              final existingIndex = _statuses.indexWhere(
+                (s) => s.id == widget.sheet!.status!.id,
+              );
+              if (existingIndex == -1) {
+                // Добавляем статус в список
+                _statuses.add(widget.sheet!.status!);
+                // Используем добавленный объект из списка
+                _selectedStatus = _statuses.last;
+              } else {
+                // Используем существующий объект из списка
+                _selectedStatus = _statuses[existingIndex];
+              }
+            } else {
+              _selectedStatus = null;
+            }
+          }
+        } else if (widget.sheet != null && widget.sheet!.status != null) {
+          // Если statusId нет, но есть объект status
+          // Проверяем, нет ли уже такого статуса в списке
+          final existingIndex = _statuses.indexWhere(
+            (s) => s.id == widget.sheet!.status!.id,
+          );
+          if (existingIndex == -1) {
+            // Добавляем статус в список
+            _statuses.add(widget.sheet!.status!);
+            // Используем добавленный объект из списка
+            _selectedStatus = _statuses.last;
+          } else {
+            // Используем существующий объект из списка
+            _selectedStatus = _statuses[existingIndex];
           }
         }
       });
     } else {
       setState(() {
         _isLoadingStatuses = false;
+        // Если загрузка не удалась, но есть статус в объекте
+        if (widget.sheet?.status != null) {
+          // Добавляем статус в список и используем его
+          _statuses = [widget.sheet!.status!];
+          _selectedStatus = widget.sheet!.status;
+        }
       });
     }
   }
@@ -104,21 +147,61 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
             .map((d) => DepartmentModel.fromJson(d as Map<String, dynamic>))
             .toList();
         _isLoadingDepartments = false;
-        // Устанавливаем выбранный отдел только после загрузки списка
-        if (widget.sheet?.responsibleDepartmentId != null && _departments.isNotEmpty) {
+        
+        // Устанавливаем выбранный отдел после загрузки списка
+        if (widget.sheet != null && widget.sheet!.responsibleDepartmentId != null) {
           try {
+            // Ищем отдел в загруженном списке по id
             _selectedDepartment = _departments.firstWhere(
               (d) => d.id == widget.sheet!.responsibleDepartmentId,
             );
           } catch (e) {
-            // Если отдел не найден, оставляем null
-            _selectedDepartment = null;
+            // Если отдел не найден в списке, но есть в объекте sheet,
+            // добавляем его в список и используем
+            if (widget.sheet!.responsibleDepartment != null) {
+              // Проверяем, нет ли уже такого отдела в списке
+              final existingIndex = _departments.indexWhere(
+                (d) => d.id == widget.sheet!.responsibleDepartment!.id,
+              );
+              if (existingIndex == -1) {
+                // Добавляем отдел в список
+                _departments.add(widget.sheet!.responsibleDepartment!);
+                // Используем добавленный объект из списка
+                _selectedDepartment = _departments.last;
+              } else {
+                // Используем существующий объект из списка
+                _selectedDepartment = _departments[existingIndex];
+              }
+            } else {
+              _selectedDepartment = null;
+            }
+          }
+        } else if (widget.sheet != null && widget.sheet!.responsibleDepartment != null) {
+          // Если responsibleDepartmentId нет, но есть объект responsibleDepartment
+          // Проверяем, нет ли уже такого отдела в списке
+          final existingIndex = _departments.indexWhere(
+            (d) => d.id == widget.sheet!.responsibleDepartment!.id,
+          );
+          if (existingIndex == -1) {
+            // Добавляем отдел в список
+            _departments.add(widget.sheet!.responsibleDepartment!);
+            // Используем добавленный объект из списка
+            _selectedDepartment = _departments.last;
+          } else {
+            // Используем существующий объект из списка
+            _selectedDepartment = _departments[existingIndex];
           }
         }
       });
     } else {
       setState(() {
         _isLoadingDepartments = false;
+        // Если загрузка не удалась, но есть отдел в объекте
+        if (widget.sheet?.responsibleDepartment != null) {
+          // Добавляем отдел в список и используем его
+          _departments = [widget.sheet!.responsibleDepartment!];
+          _selectedDepartment = widget.sheet!.responsibleDepartment;
+        }
       });
     }
   }
@@ -192,6 +275,36 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
     }
   }
 
+  /// Выбор файла
+  Future<void> _pickFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles();
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          _selectedFile = result.files.single;
+          _deleteFile = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка выбора файла: ${e.toString()}'),
+            backgroundColor: AppColors.accentPink,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Удаление файла
+  void _removeFile() {
+    setState(() {
+      _selectedFile = null;
+      _deleteFile = true;
+    });
+  }
+
   /// Сохранение листа
   Future<void> _saveSheet() async {
     if (!_formKey.currentState!.validate()) {
@@ -202,24 +315,42 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
       _isLoading = true;
     });
 
-    final data = {
-      'project_id': widget.project.id,
-      'name': _nameController.text.trim().isEmpty
-          ? null
-          : _nameController.text.trim(),
-      'description': _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text.trim(),
-      if (_selectedStatus != null) 'status_id': _selectedStatus!.id,
-      if (_selectedDepartment != null) 'responsible_department_id': _selectedDepartment!.id,
-      'is_completed': _isCompleted,
-    };
+    final data = <String, String>{};
+    data['project_id'] = widget.project.id.toString();
+    if (_nameController.text.trim().isNotEmpty) {
+      data['name'] = _nameController.text.trim();
+    }
+    if (_descriptionController.text.trim().isNotEmpty) {
+      data['description'] = _descriptionController.text.trim();
+    }
+    if (_selectedStatus != null) {
+      data['status_id'] = _selectedStatus!.id.toString();
+    }
+    if (_selectedDepartment != null) {
+      data['responsible_department_id'] = _selectedDepartment!.id.toString();
+    }
+    data['is_completed'] = _isCompleted.toString();
 
     Map<String, dynamic> result;
     if (widget.sheet == null) {
-      result = await ApiService.createProjectSheet(data);
+      // Создание нового листа
+      if (_selectedFile != null) {
+        result = await ApiService.createProjectSheetWithFile(data, _selectedFile);
+      } else {
+        result = await ApiService.createProjectSheet(data);
+      }
     } else {
-      result = await ApiService.updateProjectSheet(widget.sheet!.id, data);
+      // Обновление существующего листа
+      if (_selectedFile != null || _deleteFile) {
+        result = await ApiService.updateProjectSheetWithFile(
+          widget.sheet!.id,
+          data,
+          _selectedFile,
+          _deleteFile,
+        );
+      } else {
+        result = await ApiService.updateProjectSheet(widget.sheet!.id, data);
+      }
     }
 
     if (mounted) {
@@ -258,14 +389,16 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    
     return Dialog(
       backgroundColor: AppColors.cardBackground,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
       child: Container(
-        width: 500,
-        padding: const EdgeInsets.all(24),
+        width: isMobile ? null : 500,
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -420,6 +553,136 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
                     },
                   ),
                 const SizedBox(height: 16),
+                // Работа с файлом
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSecondary.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.borderColor.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.attach_file,
+                            color: AppColors.accentBlue,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Файл',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Текущий файл (если есть и не удален)
+                      if (widget.sheet?.fileUrl != null && 
+                          widget.sheet!.fileUrl!.isNotEmpty && 
+                          !_deleteFile && 
+                          _selectedFile == null) ...[
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.insert_drive_file,
+                              color: AppColors.textSecondary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.sheet!.fileUrl!.split('/').last,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, size: 18),
+                              color: AppColors.accentPink,
+                              onPressed: _removeFile,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      // Выбранный новый файл
+                      if (_selectedFile != null) ...[
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.insert_drive_file,
+                              color: AppColors.accentGreen,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _selectedFile!.name,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (_selectedFile!.size > 0) ...[
+                              Text(
+                                '${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              color: AppColors.accentPink,
+                              onPressed: () {
+                                setState(() {
+                                  _selectedFile = null;
+                                });
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      // Кнопка выбора файла
+                      OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _pickFile,
+                        icon: const Icon(Icons.upload_file, size: 18),
+                        label: Text(_selectedFile != null || 
+                            (widget.sheet?.fileUrl != null && 
+                             widget.sheet!.fileUrl!.isNotEmpty && 
+                             !_deleteFile)
+                            ? 'Заменить файл' 
+                            : 'Выбрать файл'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accentBlue,
+                          side: BorderSide(color: AppColors.accentBlue.withOpacity(0.5)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 // Чекбокс "Выполнено"
                 if (widget.sheet != null) ...[
                   Container(
@@ -476,14 +739,20 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
                 Row(
                   children: [
                     if (widget.sheet != null) ...[
-                      TextButton.icon(
-                        onPressed: _isLoading ? null : _deleteSheet,
-                        icon: const Icon(Icons.delete, size: 18),
-                        label: const Text('Удалить'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.accentPink,
-                        ),
-                      ),
+                      isMobile
+                          ? IconButton(
+                              onPressed: _isLoading ? null : _deleteSheet,
+                              icon: const Icon(Icons.delete),
+                              color: AppColors.accentPink,
+                            )
+                          : TextButton.icon(
+                              onPressed: _isLoading ? null : _deleteSheet,
+                              icon: const Icon(Icons.delete, size: 18),
+                              label: const Text('Удалить'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.accentPink,
+                              ),
+                            ),
                       const Spacer(),
                     ] else ...[
                       const Spacer(),
@@ -495,16 +764,31 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
                       child: const Text('Отмена'),
                     ),
                     const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _saveSheet,
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Сохранить'),
-                    ),
+                    isMobile
+                        ? IconButton(
+                            onPressed: _isLoading ? null : _saveSheet,
+                            icon: _isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.save),
+                            color: AppColors.accentBlue,
+                            style: IconButton.styleFrom(
+                              backgroundColor: AppColors.accentBlue.withOpacity(0.1),
+                            ),
+                          )
+                        : ElevatedButton(
+                            onPressed: _isLoading ? null : _saveSheet,
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Сохранить'),
+                          ),
                   ],
                 ),
               ],

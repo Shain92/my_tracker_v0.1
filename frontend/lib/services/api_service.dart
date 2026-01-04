@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
 
 /// Сервис для работы с API
 class ApiService {
@@ -1452,6 +1453,206 @@ class ApiService {
             ? jsonDecode(response.body) 
             : {'error': 'Ошибка скачивания файла'};
         return {'success': false, 'error': error['error'] ?? 'Ошибка скачивания файла'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
+  /// Создание проектного листа с файлом
+  static Future<Map<String, dynamic>> createProjectSheetWithFile(
+    Map<String, dynamic> data,
+    PlatformFile? file,
+  ) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final uri = Uri.parse('$baseUrl/projects/project-sheets/');
+      var request = http.MultipartRequest('POST', uri);
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Добавляем текстовые поля
+      data.forEach((key, value) {
+        if (value != null && value.toString().isNotEmpty && key != 'file') {
+          request.fields[key] = value.toString();
+        }
+      });
+
+      // Добавляем файл, если есть
+      if (file != null) {
+        if (file.bytes != null) {
+          // Для web
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              file.bytes!,
+              filename: file.name,
+            ),
+          );
+        } else if (file.path != null) {
+          // Для мобильных устройств
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'file',
+              file.path!,
+            ),
+          );
+        }
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            request = http.MultipartRequest('POST', uri);
+            request.headers['Authorization'] = 'Bearer $token';
+            data.forEach((key, value) {
+              if (value != null && key != 'file') {
+                request.fields[key] = value.toString();
+              }
+            });
+            if (file != null) {
+              if (file.bytes != null) {
+                request.files.add(
+                  http.MultipartFile.fromBytes(
+                    'file',
+                    file.bytes!,
+                    filename: file.name,
+                  ),
+                );
+              } else if (file.path != null) {
+                request.files.add(
+                  await http.MultipartFile.fromPath(
+                    'file',
+                    file.path!,
+                  ),
+                );
+              }
+            }
+            streamedResponse = await request.send();
+            response = await http.Response.fromStream(streamedResponse);
+          }
+        }
+      }
+
+      if (response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        return {'success': true, 'data': responseData};
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Ошибка создания листа'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
+  /// Обновление проектного листа с файлом
+  static Future<Map<String, dynamic>> updateProjectSheetWithFile(
+    int id,
+    Map<String, dynamic> data,
+    PlatformFile? file,
+    bool deleteFile,
+  ) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final uri = Uri.parse('$baseUrl/projects/project-sheets/$id/');
+      var request = http.MultipartRequest('PATCH', uri);
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Добавляем текстовые поля
+      data.forEach((key, value) {
+        if (value != null && value.toString().isNotEmpty && key != 'file') {
+          request.fields[key] = value.toString();
+        }
+      });
+
+      // Если нужно удалить файл
+      if (deleteFile) {
+        request.fields['file'] = '';
+      }
+
+      // Добавляем новый файл, если есть
+      if (file != null) {
+        if (file.bytes != null) {
+          // Для web
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              file.bytes!,
+              filename: file.name,
+            ),
+          );
+        } else if (file.path != null) {
+          // Для мобильных устройств
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'file',
+              file.path!,
+            ),
+          );
+        }
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            request = http.MultipartRequest('PATCH', uri);
+            request.headers['Authorization'] = 'Bearer $token';
+            data.forEach((key, value) {
+              if (value != null && key != 'file') {
+                request.fields[key] = value.toString();
+              }
+            });
+            if (deleteFile) {
+              request.fields['file'] = '';
+            }
+            if (file != null) {
+              if (file.bytes != null) {
+                request.files.add(
+                  http.MultipartFile.fromBytes(
+                    'file',
+                    file.bytes!,
+                    filename: file.name,
+                  ),
+                );
+              } else if (file.path != null) {
+                request.files.add(
+                  await http.MultipartFile.fromPath(
+                    'file',
+                    file.path!,
+                  ),
+                );
+              }
+            }
+            streamedResponse = await request.send();
+            response = await http.Response.fromStream(streamedResponse);
+          }
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        return {'success': true, 'data': responseData};
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Ошибка обновления листа'};
       }
     } catch (e) {
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};

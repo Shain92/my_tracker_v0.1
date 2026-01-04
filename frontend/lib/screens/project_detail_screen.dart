@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../theme/app_theme.dart';
 import '../models/app_models.dart';
 import '../services/api_service.dart';
 import '../widgets/project_stage_form_dialog.dart';
 import '../widgets/project_sheet_form_dialog.dart';
+import '../utils/web_utils.dart';
 
 /// Экран деталей проекта
 class ProjectDetailScreen extends StatefulWidget {
@@ -584,28 +586,47 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         : null,
                     activeColor: AppColors.accentGreen,
                   ),
-                  if (sheet.status != null) ...[
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: _parseColor(sheet.status!.color),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
                   Expanded(
-                    child: Text(
-                      sheet.name ?? 'Без названия',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        decoration: sheet.isCompleted
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          sheet.name ?? 'Без названия',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            decoration: sheet.isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        if (sheet.status != null) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: _parseColor(sheet.status!.color),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                sheet.status!.name,
+                                style: TextStyle(
+                                  color: _parseColor(sheet.status!.color),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   IconButton(
@@ -857,16 +878,40 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     try {
       final result = await ApiService.downloadProjectSheetFile(sheet.id);
       if (result['success'] == true) {
-        // Для веб-приложения открываем файл в новой вкладке
-        // Для мобильных приложений можно сохранить файл
-        if (sheet.fileUrl != null) {
-          // Используем url_launcher или другой механизм для открытия/скачивания
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Файл готов к скачиванию'),
-              backgroundColor: AppColors.accentGreen,
-            ),
-          );
+        final bytes = result['data'] as List<int>;
+        final headers = result['headers'] as Map<String, String>;
+        
+        // Получаем имя файла из заголовков или используем дефолтное
+        String filename = sheet.fileUrl!.split('/').last;
+        if (headers.containsKey('content-disposition')) {
+          final contentDisposition = headers['content-disposition']!;
+          // Парсим имя файла из заголовка Content-Disposition
+          // Формат: attachment; filename="file.pdf" или attachment; filename=file.pdf
+          final filenamePattern = RegExp(r'filename[^;=\n]*=([^;\n]*)');
+          final match = filenamePattern.firstMatch(contentDisposition);
+          if (match != null) {
+            String? extracted = match.group(1);
+            if (extracted != null && extracted.isNotEmpty) {
+              extracted = extracted.trim();
+              // Убираем кавычки
+              if (extracted.startsWith('"') && extracted.endsWith('"')) {
+                extracted = extracted.substring(1, extracted.length - 1);
+              } else if (extracted.startsWith("'") && extracted.endsWith("'")) {
+                extracted = extracted.substring(1, extracted.length - 1);
+              }
+              if (extracted.isNotEmpty) {
+                filename = extracted;
+              }
+            }
+          }
+        }
+        
+        // Используем прямой URL файла для скачивания
+        if (sheet.fileUrl != null && sheet.fileUrl!.isNotEmpty) {
+          _downloadFileFromUrl(sheet.fileUrl!, filename);
+        } else {
+          // Если URL нет, используем blob для веб
+          _downloadFileBytes(bytes, filename);
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -881,6 +926,63 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         SnackBar(
           content: Text('Ошибка: ${e.toString()}'),
           backgroundColor: AppColors.accentPink,
+        ),
+      );
+    }
+  }
+
+  /// Скачивание файла по URL
+  void _downloadFileFromUrl(String url, String filename) {
+    // Для веб открываем URL напрямую
+    if (kIsWeb) {
+      _openUrlWeb(url);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Файл открыт в новой вкладке'),
+          backgroundColor: AppColors.accentGreen,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Откройте файл: $url'),
+          backgroundColor: AppColors.accentBlue,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  /// Открытие URL для веб
+  void _openUrlWeb(String url) {
+    openUrlInNewTab(url);
+  }
+
+  /// Скачивание файла из байтов
+  void _downloadFileBytes(List<int> bytes, String filename) {
+    if (kIsWeb) {
+      try {
+        downloadFileFromBytes(bytes, filename);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Файл скачан'),
+            backgroundColor: AppColors.accentGreen,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка скачивания: ${e.toString()}'),
+            backgroundColor: AppColors.accentPink,
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Файл получен: $filename (${(bytes.length / 1024).toStringAsFixed(1)} KB)'),
+          backgroundColor: AppColors.accentBlue,
+          duration: const Duration(seconds: 3),
         ),
       );
     }
