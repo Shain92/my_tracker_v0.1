@@ -179,6 +179,12 @@ class ProjectStage(models.Model):
         related_name='created_stages',
         verbose_name='Автор'
     )
+    responsible_users = models.ManyToManyField(
+        User,
+        related_name='responsible_stages',
+        blank=True,
+        verbose_name='Ответственные лица'
+    )
     description = models.TextField('Описание', blank=True, null=True)
     file = models.FileField('Файл', upload_to='project_stages/', blank=True, null=True)
     created_at = models.DateTimeField('Создан', auto_now_add=True)

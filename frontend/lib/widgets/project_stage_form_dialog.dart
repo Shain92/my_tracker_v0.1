@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/app_models.dart';
+import '../models/user_model.dart';
+import 'user_autocomplete_field.dart';
 
 /// Диалог формы создания/редактирования этапа проекта
 class ProjectStageFormDialog extends StatefulWidget {
@@ -26,6 +28,7 @@ class _ProjectStageFormDialogState extends State<ProjectStageFormDialog> {
   DateTime _selectedDateTime = DateTime.now();
   StatusModel? _selectedStatus;
   List<StatusModel> _statuses = [];
+  List<UserModel> _selectedResponsibleUsers = [];
   bool _isLoading = false;
   bool _isLoadingStatuses = true;
 
@@ -35,6 +38,7 @@ class _ProjectStageFormDialogState extends State<ProjectStageFormDialog> {
     if (widget.stage != null) {
       _descriptionController.text = widget.stage!.description ?? '';
       _selectedDateTime = widget.stage!.datetime;
+      _selectedResponsibleUsers = widget.stage!.responsibleUsers ?? [];
     }
     _loadStatuses();
   }
@@ -163,6 +167,8 @@ class _ProjectStageFormDialogState extends State<ProjectStageFormDialog> {
           : _descriptionController.text.trim(),
       if (_selectedStatus != null) 'status_id': _selectedStatus!.id,
       if (userId != null) 'author_id': userId,
+      if (_selectedResponsibleUsers.isNotEmpty)
+        'responsible_user_ids': _selectedResponsibleUsers.map((u) => u.id).toList(),
     };
 
     Map<String, dynamic> result;
@@ -398,6 +404,17 @@ class _ProjectStageFormDialogState extends State<ProjectStageFormDialog> {
                       });
                     },
                   ),
+                const SizedBox(height: 16),
+                // Выбор ответственных лиц
+                UserAutocompleteField(
+                  selectedUsers: _selectedResponsibleUsers,
+                  onUsersChanged: (users) {
+                    setState(() {
+                      _selectedResponsibleUsers = users;
+                    });
+                  },
+                  labelText: 'Ответственные лица',
+                ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _descriptionController,

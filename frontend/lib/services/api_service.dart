@@ -249,6 +249,56 @@ class ApiService {
     }
   }
 
+  /// Поиск пользователей с автодополнением
+  static Future<Map<String, dynamic>> searchUsers(String query, {int? pageSize}) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final queryParams = <String, String>{
+        'search': query,
+      };
+      if (pageSize != null) queryParams['page_size'] = pageSize.toString();
+
+      final uri = Uri.parse('$baseUrl/auth/users/').replace(queryParameters: queryParams);
+      var response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            response = await http.get(
+              uri,
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            );
+          }
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data};
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? error['detail'] ?? 'Ошибка поиска пользователей'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
   /// Получение пользователя по ID
   static Future<Map<String, dynamic>> getUser(int id) async {
     try {
@@ -1121,8 +1171,12 @@ class ApiService {
         final responseData = jsonDecode(response.body);
         return {'success': true, 'data': responseData};
       } else {
-        final error = jsonDecode(response.body);
-        return {'success': false, 'error': error['error'] ?? 'Ошибка создания этапа'};
+        try {
+          final error = jsonDecode(response.body);
+          return {'success': false, 'error': error['error'] ?? 'Ошибка создания этапа'};
+        } catch (e) {
+          return {'success': false, 'error': 'Ошибка: ${response.statusCode}. Ответ не является JSON'};
+        }
       }
     } catch (e) {
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
@@ -1167,8 +1221,12 @@ class ApiService {
         final responseData = jsonDecode(response.body);
         return {'success': true, 'data': responseData};
       } else {
-        final error = jsonDecode(response.body);
-        return {'success': false, 'error': error['error'] ?? 'Ошибка обновления этапа'};
+        try {
+          final error = jsonDecode(response.body);
+          return {'success': false, 'error': error['error'] ?? 'Ошибка обновления этапа'};
+        } catch (e) {
+          return {'success': false, 'error': 'Ошибка: ${response.statusCode}. Ответ не является JSON'};
+        }
       }
     } catch (e) {
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};

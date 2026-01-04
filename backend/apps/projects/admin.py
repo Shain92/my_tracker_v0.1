@@ -85,9 +85,9 @@ class ProjectStageAdmin(admin.ModelAdmin):
     list_display = ['project', 'status', 'datetime', 'author', 'created_at']
     list_filter = ['status', 'datetime', 'created_at', 'project']
     search_fields = ['description']
-    autocomplete_fields = ['project', 'status', 'author']
+    autocomplete_fields = ['project', 'status', 'author', 'responsible_users']
     fields = [
-        'project', 'status', 'datetime', 'author',
+        'project', 'status', 'datetime', 'author', 'responsible_users',
         'description', 'file', 'created_at'
     ]
     readonly_fields = ['created_at']

@@ -208,14 +208,23 @@ class ProjectStageSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    responsible_users = UserSerializer(many=True, read_only=True)
+    responsible_user_ids = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='responsible_users',
+        many=True,
+        write_only=True,
+        required=False
+    )
     file_url = serializers.SerializerMethodField()
     
     class Meta:
         model = ProjectStage
         fields = [
             'id', 'project', 'project_id', 'status', 'status_id',
-            'datetime', 'author', 'author_id', 'description',
-            'file', 'file_url', 'created_at'
+            'datetime', 'author', 'author_id', 'responsible_users',
+            'responsible_user_ids', 'description', 'file', 'file_url',
+            'created_at'
         ]
     
     def get_file_url(self, obj):

@@ -32,6 +32,7 @@ show_menu() {
     echo -e "${GREEN}11.${NC} Очистить volumes и остановить"
     echo -e "${GREEN}12.${NC} Перезапустить контейнеры"
     echo -e "${GREEN}13.${NC} Войти в контейнер backend"
+    echo -e "${GREEN}14.${NC} Создать видео истории Git (Gource)"
     echo -e "${YELLOW}0.${NC} Выход"
     echo ""
     echo -n "Выберите опцию: "
@@ -177,6 +178,19 @@ enter_backend() {
     docker-compose -f $COMPOSE_FILE exec backend /bin/bash || docker-compose -f $COMPOSE_FILE exec backend /bin/sh
 }
 
+# Функция создания видео истории Git
+create_gource_video() {
+    echo -e "${YELLOW}Создание видео истории Git...${NC}"
+    GOURCE_PATH="/c/Program Files/Gource/gource.exe"
+    if [ -f "$GOURCE_PATH" ]; then
+        "$GOURCE_PATH" -5120x1440 -f --title "My video" --seconds-per-day 30 --auto-skip-seconds 3 --highlight-all-users --multi-sampling .
+    else
+        echo -e "${RED}Gource не найден по пути: $GOURCE_PATH${NC}"
+        echo -e "${YELLOW}Убедитесь, что Gource установлен.${NC}"
+    fi
+    read -p "Нажмите Enter для продолжения..."
+}
+
 # Главный цикл
 while true; do
     show_menu
@@ -221,6 +235,9 @@ while true; do
             ;;
         13)
             enter_backend
+            ;;
+        14)
+            create_gource_video
             ;;
         0)
             echo -e "${GREEN}Выход...${NC}"

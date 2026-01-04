@@ -381,6 +381,8 @@ class ProjectStageModel {
   final DateTime datetime;
   final UserModel? author;
   final int? authorId;
+  final List<UserModel>? responsibleUsers;
+  final List<int>? responsibleUserIds;
   final String? description;
   final String? fileUrl;
   final String? createdAt;
@@ -394,6 +396,8 @@ class ProjectStageModel {
     required this.datetime,
     this.author,
     this.authorId,
+    this.responsibleUsers,
+    this.responsibleUserIds,
     this.description,
     this.fileUrl,
     this.createdAt,
@@ -415,6 +419,22 @@ class ProjectStageModel {
       author = UserModel.fromJson(json['author'] as Map<String, dynamic>);
     }
 
+    List<UserModel>? responsibleUsers;
+    if (json['responsible_users'] != null) {
+      responsibleUsers = (json['responsible_users'] as List)
+          .map((u) => UserModel.fromJson(u as Map<String, dynamic>))
+          .toList();
+    }
+
+    List<int>? responsibleUserIds;
+    if (json['responsible_user_ids'] != null) {
+      responsibleUserIds = (json['responsible_user_ids'] as List)
+          .map((id) => id as int)
+          .toList();
+    } else if (responsibleUsers != null) {
+      responsibleUserIds = responsibleUsers.map((u) => u.id).toList();
+    }
+
     return ProjectStageModel(
       id: json['id'] as int,
       projectId: json['project_id'] as int? ?? (project?.id ?? 0),
@@ -424,6 +444,8 @@ class ProjectStageModel {
       datetime: DateTime.parse(json['datetime'] as String),
       author: author,
       authorId: json['author_id'] as int?,
+      responsibleUsers: responsibleUsers,
+      responsibleUserIds: responsibleUserIds,
       description: json['description'] as String?,
       fileUrl: json['file_url'] as String?,
       createdAt: json['created_at'] as String?,
@@ -438,6 +460,8 @@ class ProjectStageModel {
       'status_id': statusId,
       'datetime': datetime.toIso8601String(),
       'author_id': authorId,
+      'responsible_users': responsibleUsers?.map((u) => u.toJson()).toList(),
+      'responsible_user_ids': responsibleUserIds,
       'description': description,
       'file_url': fileUrl,
       'created_at': createdAt,
