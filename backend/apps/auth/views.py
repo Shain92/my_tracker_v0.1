@@ -20,46 +20,11 @@ class HasPagePermission(BasePermission):
         super().__init__()
     
     def has_permission(self, request, view):
-        # #region agent log
-        import json
-        log_path = r'r:\dev\my-tracker\my_tracker_v0.1\.cursor\debug.log'
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'D',
-                    'location': 'views.py:HasPagePermission.has_permission',
-                    'message': 'HasPagePermission check',
-                    'data': {
-                        'user': request.user.username if request.user.is_authenticated else None,
-                        'is_superuser': request.user.is_superuser if request.user.is_authenticated else False,
-                        'page_name': self.page_name
-                    },
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
         if not request.user or not request.user.is_authenticated:
             return False
         
         # Суперпользователь имеет доступ ко всему
         if request.user.is_superuser:
-            # #region agent log
-            try:
-                with open(log_path, 'a', encoding='utf-8') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'D',
-                        'location': 'views.py:HasPagePermission.has_permission',
-                        'message': 'superuser - allowed',
-                        'data': {},
-                        'timestamp': int(__import__('time').time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
             return True
         
         # Получаем отдел пользователя
@@ -67,43 +32,9 @@ class HasPagePermission(BasePermission):
         if hasattr(request.user, 'profile') and request.user.profile.department:
             department = request.user.profile.department
         
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'D',
-                    'location': 'views.py:HasPagePermission.has_permission',
-                    'message': 'department check',
-                    'data': {
-                        'has_profile': hasattr(request.user, 'profile'),
-                        'department_id': department.id if department else None,
-                        'department_name': department.name if department else None
-                    },
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
         # Если у пользователя нет отдела, доступ только к главной
         if not department:
-            result = self.page_name == 'home'
-            # #region agent log
-            try:
-                with open(log_path, 'a', encoding='utf-8') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'D',
-                        'location': 'views.py:HasPagePermission.has_permission',
-                        'message': 'no department result',
-                        'data': {'result': result, 'page_name': self.page_name},
-                        'timestamp': int(__import__('time').time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
-            return result
+            return self.page_name == 'home'
         
         # Проверяем права доступа через PagePermission
         has_access = PagePermission.objects.filter(
@@ -111,25 +42,6 @@ class HasPagePermission(BasePermission):
             department=department,
             has_access=True
         ).exists()
-        
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'D',
-                    'location': 'views.py:HasPagePermission.has_permission',
-                    'message': 'permission check result',
-                    'data': {
-                        'has_access': has_access,
-                        'page_name': self.page_name,
-                        'department_id': department.id
-                    },
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         
         return has_access
 
@@ -280,25 +192,6 @@ class UserViewSet(viewsets.ModelViewSet):
     
     def list(self, request, *args, **kwargs):
         """Получение списка пользователей с пагинацией"""
-        # #region agent log
-        import json
-        log_path = r'r:\dev\my-tracker\my_tracker_v0.1\.cursor\debug.log'
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'D',
-                    'location': 'views.py:UserViewSet.list',
-                    'message': 'UserViewSet.list called',
-                    'data': {
-                        'user': request.user.username,
-                        'is_superuser': request.user.is_superuser
-                    },
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         page = self.paginate_queryset(self.queryset)
         if page is not None:
             users_data = [self._get_user_data(user) for user in page]
@@ -518,25 +411,6 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     
     def list(self, request, *args, **kwargs):
         """Получение списка отделов"""
-        # #region agent log
-        import json
-        log_path = r'r:\dev\my-tracker\my_tracker_v0.1\.cursor\debug.log'
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'D',
-                    'location': 'views.py:DepartmentViewSet.list',
-                    'message': 'DepartmentViewSet.list called',
-                    'data': {
-                        'user': request.user.username,
-                        'is_superuser': request.user.is_superuser
-                    },
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         # Принудительно обновляем queryset, чтобы получить свежие данные
         departments = Department.objects.all().order_by('name')
         departments_data = [
@@ -632,47 +506,12 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 @permission_classes([IsAuthenticated])
 def page_permissions(request):
     """Получение матрицы прав доступа"""
-    # #region agent log
-    import json
-    log_path = r'r:\dev\my-tracker\my_tracker_v0.1\.cursor\debug.log'
-    try:
-        with open(log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'A',
-                'location': 'views.py:457',
-                'message': 'page_permissions called',
-                'data': {'user': request.user.username if request.user.is_authenticated else None},
-                'timestamp': int(__import__('time').time() * 1000)
-            }) + '\n')
-    except: pass
-    # #endregion
     try:
         departments = Department.objects.all().order_by('name')
         pages = [choice[0] for choice in PagePermission.PAGE_CHOICES]
         
         # Получаем все права доступа
         permissions = PagePermission.objects.select_related('department').all()
-        
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'A',
-                    'location': 'views.py:475',
-                    'message': 'departments and permissions loaded',
-                    'data': {
-                        'departments_count': departments.count(),
-                        'permissions_count': permissions.count(),
-                        'department_names': [d.name for d in departments]
-                    },
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         
         # Создаем словарь для быстрого доступа: page_name -> department_id -> has_access
         permissions_map = {}
@@ -681,21 +520,6 @@ def page_permissions(request):
                 if perm.page_name not in permissions_map:
                     permissions_map[perm.page_name] = {}
                 permissions_map[perm.page_name][perm.department.id] = perm.has_access
-        
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'A',
-                    'location': 'views.py:492',
-                    'message': 'permissions_map created',
-                    'data': {'map_keys': list(permissions_map.keys()), 'map_size': len(permissions_map)},
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         
         # Формируем структуру данных - показываем ВСЕ отделы для ВСЕХ страниц
         pages_data = []
@@ -715,24 +539,6 @@ def page_permissions(request):
                 'departments': departments_data,
             })
         
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'A',
-                    'location': 'views.py:515',
-                    'message': 'pages_data created',
-                    'data': {
-                        'pages_count': len(pages_data),
-                        'first_page_departments_count': len(pages_data[0]['departments']) if pages_data else 0
-                    },
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
         departments_data = [
             {
                 'id': dept.id,
@@ -746,20 +552,6 @@ def page_permissions(request):
             'departments': departments_data,
         })
     except Exception as e:
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'A',
-                    'location': 'views.py:535',
-                    'message': 'page_permissions error',
-                    'data': {'error': str(e)},
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
@@ -770,44 +562,9 @@ def page_permissions(request):
 @permission_classes([IsAuthenticated])
 def update_page_permissions(request):
     """Обновление прав доступа"""
-    # #region agent log
-    import json
-    log_path = r'r:\dev\my-tracker\my_tracker_v0.1\.cursor\debug.log'
-    try:
-        with open(log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'B',
-                'location': 'views.py:505',
-                'message': 'update_page_permissions called',
-                'data': {
-                    'user': request.user.username if request.user.is_authenticated else None,
-                    'permissions_count': len(request.data.get('permissions', []))
-                },
-                'timestamp': int(__import__('time').time() * 1000)
-            }) + '\n')
-    except: pass
-    # #endregion
     try:
         permissions_data = request.data.get('permissions', [])
         
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'B',
-                    'location': 'views.py:520',
-                    'message': 'permissions_data received',
-                    'data': {'permissions': permissions_data[:5]},  # Первые 5 для примера
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
-        updated_count = 0
         for perm_data in permissions_data:
             page_name = perm_data.get('page_name')
             department_id = perm_data.get('department_id')
@@ -818,66 +575,16 @@ def update_page_permissions(request):
             
             try:
                 department = Department.objects.get(id=department_id)
-                perm, created = PagePermission.objects.update_or_create(
+                PagePermission.objects.update_or_create(
                     page_name=page_name,
                     department=department,
                     defaults={'has_access': has_access}
                 )
-                updated_count += 1
-                # #region agent log
-                try:
-                    with open(log_path, 'a', encoding='utf-8') as f:
-                        f.write(json.dumps({
-                            'sessionId': 'debug-session',
-                            'runId': 'run1',
-                            'hypothesisId': 'B',
-                            'location': 'views.py:545',
-                            'message': 'permission updated',
-                            'data': {
-                                'page_name': page_name,
-                                'department_id': department_id,
-                                'department_name': department.name,
-                                'has_access': has_access,
-                                'created': created
-                            },
-                            'timestamp': int(__import__('time').time() * 1000)
-                        }) + '\n')
-                except: pass
-                # #endregion
             except Department.DoesNotExist:
                 continue
         
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'B',
-                    'location': 'views.py:565',
-                    'message': 'update_page_permissions completed',
-                    'data': {'updated_count': updated_count},
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
         return Response({'message': 'Права доступа обновлены'})
     except Exception as e:
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'B',
-                    'location': 'views.py:575',
-                    'message': 'update_page_permissions error',
-                    'data': {'error': str(e)},
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
@@ -888,45 +595,12 @@ def update_page_permissions(request):
 @permission_classes([IsAuthenticated])
 def user_permissions(request):
     """Получение доступных страниц для текущего пользователя"""
-    # #region agent log
-    import json
-    log_path = r'r:\dev\my-tracker\my_tracker_v0.1\.cursor\debug.log'
-    try:
-        with open(log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'C',
-                'location': 'views.py:590',
-                'message': 'user_permissions called',
-                'data': {
-                    'user': request.user.username,
-                    'is_superuser': request.user.is_superuser
-                },
-                'timestamp': int(__import__('time').time() * 1000)
-            }) + '\n')
-    except: pass
-    # #endregion
     try:
         user = request.user
         
         # Суперпользователь видит все страницы
         if user.is_superuser:
             pages = [choice[0] for choice in PagePermission.PAGE_CHOICES]
-            # #region agent log
-            try:
-                with open(log_path, 'a', encoding='utf-8') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'C',
-                        'location': 'views.py:605',
-                        'message': 'superuser - all pages',
-                        'data': {'pages': pages},
-                        'timestamp': int(__import__('time').time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
             return Response({'pages': pages})
         
         # Получаем отдел пользователя
@@ -934,41 +608,8 @@ def user_permissions(request):
         if hasattr(user, 'profile') and user.profile.department:
             department = user.profile.department
         
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'C',
-                    'location': 'views.py:620',
-                    'message': 'user department check',
-                    'data': {
-                        'has_profile': hasattr(user, 'profile'),
-                        'department_id': department.id if department else None,
-                        'department_name': department.name if department else None
-                    },
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
         # Если у пользователя нет отдела, видит только главную
         if not department:
-            # #region agent log
-            try:
-                with open(log_path, 'a', encoding='utf-8') as f:
-                    f.write(json.dumps({
-                        'sessionId': 'debug-session',
-                        'runId': 'run1',
-                        'hypothesisId': 'C',
-                        'location': 'views.py:635',
-                        'message': 'no department - only home',
-                        'data': {},
-                        'timestamp': int(__import__('time').time() * 1000)
-                    }) + '\n')
-            except: pass
-            # #endregion
             return Response({'pages': ['home']})
         
         # Получаем права доступа для отдела
@@ -977,58 +618,11 @@ def user_permissions(request):
             has_access=True
         ).values_list('page_name', flat=True)
         
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'C',
-                    'location': 'views.py:650',
-                    'message': 'permissions queried',
-                    'data': {
-                        'permissions_count': permissions.count(),
-                        'permissions': list(permissions)
-                    },
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
         # Главная страница всегда доступна
         pages = ['home'] + list(permissions)
         
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'C',
-                    'location': 'views.py:665',
-                    'message': 'user_permissions result',
-                    'data': {'pages': pages},
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
-        
         return Response({'pages': pages})
     except Exception as e:
-        # #region agent log
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({
-                    'sessionId': 'debug-session',
-                    'runId': 'run1',
-                    'hypothesisId': 'C',
-                    'location': 'views.py:675',
-                    'message': 'user_permissions error',
-                    'data': {'error': str(e)},
-                    'timestamp': int(__import__('time').time() * 1000)
-                }) + '\n')
-        except: pass
-        # #endregion
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
