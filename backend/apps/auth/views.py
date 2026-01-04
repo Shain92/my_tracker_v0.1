@@ -160,8 +160,9 @@ class UserViewSet(viewsets.ModelViewSet):
         # Для чтения (list, retrieve) проверяем через PagePermission
         if self.action in ['list', 'retrieve']:
             return [IsAuthenticated(), HasPagePermission('users_list')]
-        # Для создания, обновления, удаления - только суперпользователи
-        return [IsAuthenticated(), IsAdminUser()]
+        # Для создания, обновления, удаления - проверяем доступ к странице users_list
+        # Суперпользователи всегда имеют доступ
+        return [IsAuthenticated(), HasPagePermission('users_list')]
     
     def get_serializer_class(self):
         """Возвращает сериализатор в зависимости от действия"""
@@ -276,14 +277,14 @@ class UserViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         """Обновление пользователя (PUT)"""
         user = self.get_object()
-        return self._update_user(user, request.data, partial=False)
+        return self._update_user(request, user, request.data, partial=False)
     
     def partial_update(self, request, *args, **kwargs):
         """Частичное обновление пользователя (PATCH)"""
         user = self.get_object()
-        return self._update_user(user, request.data, partial=True)
+        return self._update_user(request, user, request.data, partial=True)
     
-    def _update_user(self, user, data, partial=False):
+    def _update_user(self, request, user, data, partial=False):
         """Вспомогательный метод для обновления пользователя"""
         if 'username' in data:
             new_username = data['username']
@@ -384,8 +385,11 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         """Возвращает permissions в зависимости от действия"""
-        # Для чтения (list, retrieve) проверяем через PagePermission
-        if self.action in ['list', 'retrieve']:
+        # Для чтения списка (list) - все авторизованные пользователи (нужно для выбора отдела при редактировании пользователя)
+        if self.action == 'list':
+            return [IsAuthenticated()]
+        # Для просмотра одного отдела (retrieve) проверяем через PagePermission
+        if self.action == 'retrieve':
             return [IsAuthenticated(), HasPagePermission('departments_list')]
         # Для создания, обновления, удаления - только суперпользователи
         return [IsAuthenticated(), IsAdminUser()]
