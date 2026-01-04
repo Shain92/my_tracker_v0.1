@@ -268,4 +268,70 @@ class ConstructionSiteModel {
   }
 }
 
+/// Модель проекта
+class ProjectModel {
+  final int id;
+  final String name;
+  final String? description;
+  final String code;
+  final String cipher;
+  final ConstructionSiteModel? constructionSite;
+  final int? constructionSiteId;
+  final double? completionPercentage;
+  final String? createdAt;
+  final String? updatedAt;
+
+  ProjectModel({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.code,
+    required this.cipher,
+    this.constructionSite,
+    this.constructionSiteId,
+    this.completionPercentage,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory ProjectModel.fromJson(Map<String, dynamic> json) {
+    ConstructionSiteModel? constructionSite;
+    if (json['construction_site'] != null) {
+      constructionSite = ConstructionSiteModel.fromJson(
+        json['construction_site'] as Map<String, dynamic>,
+      );
+    }
+
+    return ProjectModel(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+      code: json['code'] as String,
+      cipher: json['cipher'] as String,
+      constructionSite: constructionSite,
+      constructionSiteId: json['construction_site_id'] as int?,
+      completionPercentage: json['completion_percentage'] != null
+          ? (json['completion_percentage'] as num).toDouble()
+          : null,
+      createdAt: json['created_at'] as String?,
+      updatedAt: json['updated_at'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'code': code,
+      'cipher': cipher,
+      'construction_site': constructionSite?.toJson(),
+      'construction_site_id': constructionSiteId,
+      'completion_percentage': completionPercentage,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+    };
+  }
+}
+
 

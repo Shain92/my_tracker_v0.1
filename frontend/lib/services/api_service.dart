@@ -660,15 +660,20 @@ class ApiService {
   }
 
   /// Получение списка проектов
-  static Future<Map<String, dynamic>> getProjects() async {
+  static Future<Map<String, dynamic>> getProjects({int? constructionSiteId}) async {
     try {
       var token = await getAccessToken();
       if (token == null || token.isEmpty) {
         return {'success': false, 'error': 'Не авторизован'};
       }
 
+      var uri = Uri.parse('$baseUrl/projects/projects/');
+      if (constructionSiteId != null) {
+        uri = uri.replace(queryParameters: {'construction_site_id': constructionSiteId.toString()});
+      }
+
       var response = await http.get(
-        Uri.parse('$baseUrl/projects/projects/'),
+        uri,
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -681,7 +686,7 @@ class ApiService {
           token = await getAccessToken();
           if (token != null) {
             response = await http.get(
-              Uri.parse('$baseUrl/projects/projects/'),
+              uri,
               headers: {
                 'Authorization': 'Bearer $token',
                 'Content-Type': 'application/json',
