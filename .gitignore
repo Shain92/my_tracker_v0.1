@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/ - removed to allow frontend/lib/ (Flutter source code)
 lib64/
 parts/
 sdist/
@@ -129,8 +129,10 @@ dmypy.json
 .pyre/
 
 # Django specific
-static/
-media/
+# static/ - commented out, may need static files in some cases
+# media/ - commented out, may need media files in some cases
+backend/staticfiles/
+backend/media/
 
 # Logs
 *.log
@@ -154,9 +156,12 @@ ehthumbs.db
 Thumbs.db
 
 # Docker
-.dockerignore
+# .dockerignore - removed to allow backend/.dockerignore
 
 # Backup files
 *.bak
 *.backup
 *.old
+
+# Explicitly allow frontend/lib/ (Flutter source code)
+!frontend/lib/
