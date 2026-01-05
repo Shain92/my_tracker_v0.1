@@ -64,6 +64,20 @@ class _UserAutocompleteFieldState extends State<UserAutocompleteField> {
             .toList();
       }
       
+      // Фильтруем по введенному тексту (клиентская фильтрация для надежности)
+      final queryLower = query.toLowerCase().trim();
+      users = users.where((user) {
+        final username = user.username.toLowerCase();
+        final firstName = (user.firstName ?? '').toLowerCase();
+        final lastName = (user.lastName ?? '').toLowerCase();
+        final fullName = '$firstName $lastName'.trim().toLowerCase();
+        
+        return username.contains(queryLower) ||
+            firstName.contains(queryLower) ||
+            lastName.contains(queryLower) ||
+            fullName.contains(queryLower);
+      }).toList();
+      
       // Фильтруем уже выбранных пользователей
       final selectedIds = widget.selectedUsers.map((u) => u.id).toSet();
       users = users.where((u) => !selectedIds.contains(u.id)).toList();

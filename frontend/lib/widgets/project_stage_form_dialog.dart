@@ -59,14 +59,24 @@ class _ProjectStageFormDialogState extends State<ProjectStageFormDialog> {
             .toList();
         _isLoadingStatuses = false;
         // Устанавливаем выбранный статус только после загрузки списка
-        if (widget.stage?.statusId != null && _statuses.isNotEmpty) {
-          try {
-            _selectedStatus = _statuses.firstWhere(
-              (s) => s.id == widget.stage!.statusId,
-            );
-          } catch (e) {
-            // Если статус не найден, оставляем null
-            _selectedStatus = null;
+        if (widget.stage != null && _statuses.isNotEmpty) {
+          // Используем объект status, если он есть, иначе ищем по statusId
+          if (widget.stage!.status != null) {
+            try {
+              _selectedStatus = _statuses.firstWhere(
+                (s) => s.id == widget.stage!.status!.id,
+              );
+            } catch (e) {
+              _selectedStatus = null;
+            }
+          } else if (widget.stage!.statusId != null) {
+            try {
+              _selectedStatus = _statuses.firstWhere(
+                (s) => s.id == widget.stage!.statusId,
+              );
+            } catch (e) {
+              _selectedStatus = null;
+            }
           }
         }
       });
