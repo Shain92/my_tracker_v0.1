@@ -451,9 +451,26 @@
             }
         };
 
+        // Флаг для отслеживания отключения layout
+        let layoutDisabled = false;
+
         // Создание сети
         const container = document.getElementById('network');
         const network = new vis.Network(container, data, options);
+
+        // Отключаем layout сразу после создания для свободного перемещения
+        setTimeout(() => {
+            if (!layoutDisabled) {
+                network.setOptions({
+                    layout: {
+                        hierarchical: {
+                            enabled: false
+                        }
+                    }
+                });
+                layoutDisabled = true;
+            }
+        }, 1500);
 
         // Обработка двойного клика на узел для показа деталей
         network.on('doubleClick', function(params) {
@@ -487,26 +504,44 @@
             container.style.cursor = 'default';
         });
 
-        // Автоматическое масштабирование при загрузке и отключение иерархического layout
-        network.on('stabilizationEnd', function() {
-            network.fit({
-                animation: {
-                    duration: 500,
-                    easingFunction: 'easeInOutQuad'
-                }
-            });
-            
-            // Отключаем иерархический layout после загрузки для свободного перемещения
-            setTimeout(() => {
-                const newOptions = {
+        // Отключаем layout при первом перетаскивании (приоритетный способ)
+        network.on('dragStart', function() {
+            if (!layoutDisabled) {
+                network.setOptions({
                     layout: {
                         hierarchical: {
                             enabled: false
                         }
                     }
-                };
-                network.setOptions(newOptions);
-            }, 600);
+                });
+                layoutDisabled = true;
+            }
+        });
+
+        // Автоматическое масштабирование при загрузке и отключение иерархического layout
+        network.on('stabilizationEnd', function() {
+            if (!layoutDisabled) {
+                network.fit({
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                
+                // Отключаем иерархический layout сразу после стабилизации
+                setTimeout(() => {
+                    if (!layoutDisabled) {
+                        network.setOptions({
+                            layout: {
+                                hierarchical: {
+                                    enabled: false
+                                }
+                            }
+                        });
+                        layoutDisabled = true;
+                    }
+                }, 100);
+            }
         });
 
         // Сохраняем позиции узлов при перетаскивании

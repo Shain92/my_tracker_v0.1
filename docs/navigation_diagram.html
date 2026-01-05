@@ -193,14 +193,21 @@
                 }
             },
             physics: {
-                enabled: false
+                enabled: false,
+                stabilization: {
+                    enabled: true,
+                    iterations: 100
+                }
             },
             interaction: {
                 zoomView: true,
                 dragView: true,
                 dragNodes: true,
                 selectConnectedEdges: false,
-                multiselect: false
+                multiselect: false,
+                navigationButtons: false,
+                keyboard: true,
+                tooltipDelay: 100
             },
             manipulation: {
                 enabled: false
@@ -211,9 +218,34 @@
         const container = document.getElementById('network');
         const network = new vis.Network(container, data, options);
 
-        // Обработка клика на узел
+        // Отключаем layout сразу после создания для свободного перемещения
+        // Используем setTimeout чтобы дать время на первоначальное расположение
+        setTimeout(() => {
+            network.setOptions({
+                layout: {
+                    hierarchical: {
+                        enabled: false
+                    }
+                }
+            });
+        }, 1500);
+
+        // Обработка клика на узел (только если не было перетаскивания)
+        let isDragging = false;
+        
+        network.on('dragStart', function() {
+            isDragging = true;
+        });
+        
+        network.on('dragEnd', function() {
+            setTimeout(() => {
+                isDragging = false;
+            }, 100);
+        });
+        
         network.on('click', function(params) {
-            if (params.nodes.length > 0) {
+            // Копируем только если это был клик, а не окончание перетаскивания
+            if (!isDragging && params.nodes.length > 0) {
                 const nodeId = params.nodes[0];
                 const node = nodes.get(nodeId);
                 const file = node.file;
@@ -276,33 +308,41 @@
             }, 2500);
         }
 
-        // Автоматическое масштабирование при загрузке и отключение иерархического layout
+        // Автоматическое масштабирование при загрузке и отключение layout
+        let layoutApplied = false;
+        
         network.on('stabilizationEnd', function() {
-            network.fit({
-                animation: {
-                    duration: 500,
-                    easingFunction: 'easeInOutQuad'
-                }
-            });
-            
-            // Отключаем иерархический layout после загрузки для свободного перемещения
-            setTimeout(() => {
-                const newOptions = {
+            if (!layoutApplied) {
+                network.fit({
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                
+                // Отключаем иерархический layout сразу после загрузки
+                network.setOptions({
                     layout: {
                         hierarchical: {
                             enabled: false
                         }
                     }
-                };
-                network.setOptions(newOptions);
-            }, 600);
+                });
+                layoutApplied = true;
+            }
         });
 
-        // Сохраняем позиции узлов при перетаскивании
-        network.on('dragEnd', function(params) {
-            if (params.nodes.length > 0) {
-                // Позиции уже сохранены автоматически в vis.js
-                // Можно добавить сохранение в localStorage если нужно
+        // Принудительно отключаем layout при первом взаимодействии
+        network.on('dragStart', function() {
+            if (!layoutApplied) {
+                network.setOptions({
+                    layout: {
+                        hierarchical: {
+                            enabled: false
+                        }
+                    }
+                });
+                layoutApplied = true;
             }
         });
     </script>
