@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Блок-схема моделей проекта</title>
+    <title>Блок-схема моделей My Tracker</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network@latest/standalone/umd/vis-network.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -13,1057 +14,499 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #1a1a2e;
+            overflow: hidden;
+        }
+
+        #network {
+            width: 100vw;
+            height: 100vh;
+            background: #ffffff;
+        }
+
+        .details-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(26, 26, 46, 0.95);
+            color: #4fc3f7;
             padding: 20px;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1600px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-        }
-
-        .diagram {
-            position: relative;
-            width: 100%;
-            min-height: 1200px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 40px;
-            overflow: visible;
-        }
-
-        .model-box {
-            position: absolute;
-            background: white;
-            border: 2px solid #4a90e2;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            min-width: 220px;
-            transition: transform 0.2s, box-shadow 0.2s;
-            cursor: move;
-            user-select: none;
-        }
-
-        .model-box:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(74, 144, 226, 0.3);
-        }
-
-        .model-box.dragging {
-            opacity: 0.8;
+            border-radius: 12px;
+            border: 2px solid #4fc3f7;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
             z-index: 1000;
-            cursor: grabbing;
-            box-shadow: 0 8px 30px rgba(74, 144, 226, 0.5);
-        }
-
-        .model-header {
-            background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
-            color: white;
-            padding: 12px 15px;
-            font-weight: bold;
-            font-size: 16px;
-            border-radius: 6px 6px 0 0;
-            cursor: grab;
-            user-select: none;
-        }
-
-        .model-header:hover {
-            background: linear-gradient(135deg, #357abd 0%, #2a5f8f 100%);
-        }
-
-        .model-header:active {
-            cursor: grabbing;
-        }
-
-        .model-russian-name {
-            text-align: center;
-            padding: 8px 15px;
-            font-size: 13px;
-            color: #6c757d;
-            font-style: italic;
-            background: #f8f9fa;
-            border-top: 1px solid #e9ecef;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .model-fields {
-            padding: 10px;
-        }
-
-        .field-row {
-            padding: 6px 8px;
-            font-size: 13px;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: default;
-            transition: background-color 0.2s;
-        }
-
-        .field-row.highlighted {
-            background-color: #fff3cd;
-            border-left: 3px solid #ffc107;
-            font-weight: bold;
-        }
-
-        .connection-line.highlighted {
-            stroke: #ffc107;
-            stroke-width: 3;
-        }
-
-        text.connection-label.highlighted {
-            fill: #ffc107;
-            font-weight: bold;
-        }
-
-        .field-row:last-child {
-            border-bottom: none;
-        }
-
-        .field-name {
-            color: #495057;
-            font-weight: 500;
-        }
-
-        .field-type {
-            color: #6c757d;
-            font-size: 11px;
-            font-style: italic;
-        }
-
-        .field-pk {
-            color: #28a745;
-            font-weight: bold;
-        }
-
-        .field-fk {
-            color: #ffc107;
-            font-weight: bold;
-        }
-
-        .field-m2m {
-            color: #dc3545;
-            font-weight: bold;
-        }
-
-        .connection {
-            position: absolute;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .connection-line {
-            stroke: #6c757d;
-            stroke-width: 2;
-            fill: none;
-            marker-end: url(#arrowhead);
-        }
-
-        .connection-label {
-            font-size: 11px;
-            fill: #495057;
-            background: white;
-            padding: 2px 4px;
-            border-radius: 3px;
-        }
-
-        .legend {
-            margin-top: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 3px;
-        }
-
-        .legend-pk { background: #28a745; }
-        .legend-fk { background: #ffc107; }
-        .legend-m2m { background: #dc3545; }
-        .legend-normal { background: #6c757d; }
-
-        .tooltip {
-            position: absolute;
-            background: rgba(0,0,0,0.9);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 5px;
-            font-size: 12px;
-            pointer-events: none;
-            z-index: 1000;
+            box-shadow: 0 5px 30px rgba(79, 195, 247, 0.5);
             display: none;
+            backdrop-filter: blur(10px);
         }
 
-        svg {
+        .details-panel.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .details-panel h3 {
+            color: #4fc3f7;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #4fc3f7;
+            padding-bottom: 10px;
+        }
+
+        .details-panel .description {
+            color: #81d4fa;
+            margin-bottom: 15px;
+            font-style: italic;
+            font-size: 14px;
+        }
+
+        .details-panel .field {
+            margin-bottom: 12px;
+            padding: 8px;
+            background: rgba(79, 195, 247, 0.1);
+            border-radius: 6px;
+            border-left: 3px solid #4fc3f7;
+        }
+
+        .details-panel .field-name {
+            color: #4fc3f7;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .details-panel .field-type {
+            color: #81d4fa;
+            font-size: 12px;
+            margin-bottom: 2px;
+        }
+
+        .details-panel .field-desc {
+            color: #b0bec5;
+            font-size: 12px;
+        }
+
+        .details-panel .close-btn {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            color: #4fc3f7;
+            font-size: 24px;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
         }
 
-        .connection-line {
-            pointer-events: stroke;
+        .details-panel .close-btn:hover {
+            background: rgba(79, 195, 247, 0.2);
+        }
+
+        .expand-icon {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            color: #4fc3f7;
+            font-size: 16px;
             cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Блок-схема моделей проекта</h1>
-        
-        <div class="diagram" id="diagram">
-            <svg id="connections">
-                <defs>
-                    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                        <polygon points="0 0, 10 3, 0 6" fill="#6c757d" />
-                    </marker>
-                </defs>
-            </svg>
-
-            <!-- User Model -->
-            <div class="model-box" style="top: 50px; left: 50px;" 
-                 data-model="User"
-                 data-prompt-info="Модель: User (Django стандартная модель из django.contrib.auth.models). Используется для аутентификации. Связана с UserProfile через OneToOne, управляет ConstructionSite, исполняет ProjectSheet (M2M), создает ProjectStage и ProjectSheetNote."
-                 data-file-path="django.contrib.auth.models.User">
-                <div class="model-header" title="Модель: User (Django стандартная модель)">User</div>
-                <div class="model-russian-name">Пользователь</div>
-                <div class="model-fields">
-                    <div class="field-row" data-field-prompt="id: Primary Key, автоматически создается Django">
-                        <span class="field-name field-pk">id</span>
-                        <span class="field-type">PK</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="username: Уникальное имя пользователя, используется для входа">
-                        <span class="field-name">username</span>
-                        <span class="field-type">string</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="email: Email адрес пользователя">
-                        <span class="field-name">email</span>
-                        <span class="field-type">string</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="date_joined: Дата регистрации пользователя">
-                        <span class="field-name">date_joined</span>
-                        <span class="field-type">datetime</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Department Model -->
-            <div class="model-box" style="top: 50px; left: 350px;" 
-                 data-model="Department"
-                 data-prompt-info="Модель: Department (Отдел). Хранит информацию об отделах. Связана с UserProfile через ForeignKey (многие пользователи могут быть в одном отделе). Файл: backend/apps/auth/models.py"
-                 data-file-path="backend/apps/auth/models.py">
-                <div class="model-header" title="Модель: Department (Отдел)">Department</div>
-                <div class="model-russian-name">Отдел</div>
-                <div class="model-fields">
-                    <div class="field-row" data-field-prompt="id: Primary Key, автоматически создается Django">
-                        <span class="field-name field-pk">id</span>
-                        <span class="field-type">PK</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="name: Название отдела, обязательное поле, максимум 200 символов">
-                        <span class="field-name">name</span>
-                        <span class="field-type">CharField(200)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="description: Описание отдела, необязательное поле">
-                        <span class="field-name">description</span>
-                        <span class="field-type">TextField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="color: HEX цвет для визуализации отдела, формат #RRGGBB, по умолчанию #000000">
-                        <span class="field-name">color</span>
-                        <span class="field-type">CharField(7)</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- UserProfile Model -->
-            <div class="model-box" style="top: 50px; left: 650px;" 
-                 data-model="UserProfile"
-                 data-prompt-info="Модель: UserProfile (Профиль пользователя). Расширяет стандартную модель User. Связана с User через OneToOne (один профиль на пользователя), с Department через ForeignKey (необязательно). Автоматически создается при создании User через сигналы. Файл: backend/apps/auth/models.py"
-                 data-file-path="backend/apps/auth/models.py">
-                <div class="model-header" title="Модель: UserProfile (Профиль пользователя)">UserProfile</div>
-                <div class="model-russian-name">Профиль пользователя</div>
-                <div class="model-fields">
-                    <div class="field-row" data-field-prompt="id: Primary Key, автоматически создается Django">
-                        <span class="field-name field-pk">id</span>
-                        <span class="field-type">PK</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="user_id: ForeignKey к User, OneToOne связь, обязательное поле, related_name='profile'" data-connection="User-UserProfile">
-                        <span class="field-name field-fk">user_id</span>
-                        <span class="field-type">FK → User</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="department_id: ForeignKey к Department, необязательное поле, может быть NULL, related_name='users', on_delete=SET_NULL" data-connection="Department-UserProfile">
-                        <span class="field-name field-fk">department_id</span>
-                        <span class="field-type">FK → Department</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Status Model -->
-            <div class="model-box" style="top: 300px; left: 50px;" 
-                 data-model="Status"
-                 data-prompt-info="Модель: Status (Статус). Используется для статусов ProjectSheet и ProjectStage. Имеет два типа: 'sheet' (проектный лист) и 'stage' (этап проекта). Связана с ProjectSheet и ProjectStage через ForeignKey. Уникальность по комбинации name и status_type. Файл: backend/apps/projects/models.py"
-                 data-file-path="backend/apps/projects/models.py">
-                <div class="model-header" title="Модель: Status (Статус)">Status</div>
-                <div class="model-russian-name">Статус</div>
-                <div class="model-fields">
-                    <div class="field-row" data-field-prompt="id: Primary Key, автоматически создается Django">
-                        <span class="field-name field-pk">id</span>
-                        <span class="field-type">PK</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="name: Название статуса, обязательное поле, максимум 100 символов">
-                        <span class="field-name">name</span>
-                        <span class="field-type">CharField(100)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="color: HEX цвет для визуализации статуса, формат #RRGGBB, по умолчанию #000000">
-                        <span class="field-name">color</span>
-                        <span class="field-type">CharField(7)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="status_type: Тип статуса, выбор из ('sheet', 'stage'), обязательное поле">
-                        <span class="field-name">status_type</span>
-                        <span class="field-type">CharField(10)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="created_at: Дата создания статуса, автоматически устанавливается при создании">
-                        <span class="field-name">created_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ConstructionSite Model -->
-            <div class="model-box" style="top: 300px; left: 350px;" 
-                 data-model="ConstructionSite"
-                 data-prompt-info="Модель: ConstructionSite (Строительный участок). Содержит проекты (Project). Имеет менеджера (User) через ForeignKey. Имеет вычисляемое свойство completion_percentage (средний процент выполнения всех проектов). Файл: backend/apps/projects/models.py"
-                 data-file-path="backend/apps/projects/models.py">
-                <div class="model-header" title="Модель: ConstructionSite (Строительный участок)">ConstructionSite</div>
-                <div class="model-russian-name">Строительный участок</div>
-                <div class="model-fields">
-                    <div class="field-row" data-field-prompt="id: Primary Key, автоматически создается Django">
-                        <span class="field-name field-pk">id</span>
-                        <span class="field-type">PK</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="name: Название строительного участка, обязательное поле, максимум 200 символов">
-                        <span class="field-name">name</span>
-                        <span class="field-type">CharField(200)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="description: Описание участка, необязательное поле">
-                        <span class="field-name">description</span>
-                        <span class="field-type">TextField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="manager_id: ForeignKey к User (начальник участка), необязательное поле, может быть NULL, related_name='managed_sites', on_delete=SET_NULL" data-connection="User-ConstructionSite">
-                        <span class="field-name field-fk">manager_id</span>
-                        <span class="field-type">FK → User</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="created_at: Дата создания участка, автоматически устанавливается при создании">
-                        <span class="field-name">created_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="updated_at: Дата последнего обновления участка, автоматически обновляется при сохранении">
-                        <span class="field-name">updated_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Project Model -->
-            <div class="model-box" style="top: 300px; left: 650px;" 
-                 data-model="Project"
-                 data-prompt-info="Модель: Project (Проект). Принадлежит ConstructionSite через ForeignKey. Содержит ProjectSheet и ProjectStage. Имеет уникальность по комбинации code и cipher. Имеет вычисляемое свойство completion_percentage (процент выполненных листов). Файл: backend/apps/projects/models.py"
-                 data-file-path="backend/apps/projects/models.py">
-                <div class="model-header" title="Модель: Project (Проект)">Project</div>
-                <div class="model-russian-name">Проект</div>
-                <div class="model-fields">
-                    <div class="field-row" data-field-prompt="id: Primary Key, автоматически создается Django">
-                        <span class="field-name field-pk">id</span>
-                        <span class="field-type">PK</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="name: Название проекта, обязательное поле, максимум 200 символов">
-                        <span class="field-name">name</span>
-                        <span class="field-type">CharField(200)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="description: Описание проекта, необязательное поле">
-                        <span class="field-name">description</span>
-                        <span class="field-type">TextField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="code: Код проекта, обязательное поле, максимум 50 символов, часть unique_together с cipher">
-                        <span class="field-name">code</span>
-                        <span class="field-type">CharField(50)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="cipher: Шифр проекта, обязательное поле, максимум 50 символов, часть unique_together с code">
-                        <span class="field-name">cipher</span>
-                        <span class="field-type">CharField(50)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="construction_site_id: ForeignKey к ConstructionSite, обязательное поле, related_name='projects', on_delete=CASCADE" data-connection="ConstructionSite-Project">
-                        <span class="field-name field-fk">construction_site_id</span>
-                        <span class="field-type">FK → ConstructionSite</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="created_at: Дата создания проекта, автоматически устанавливается при создании">
-                        <span class="field-name">created_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="updated_at: Дата последнего обновления проекта, автоматически обновляется при сохранении">
-                        <span class="field-name">updated_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ProjectSheet Model -->
-            <div class="model-box" style="top: 600px; left: 350px;" 
-                 data-model="ProjectSheet"
-                 data-prompt-info="Модель: ProjectSheet (Проектный лист). Принадлежит Project через ForeignKey. Имеет Status через ForeignKey (только статусы типа 'sheet'). Связана с User через ManyToMany (executors). Содержит ProjectSheetNote. При установке is_completed=True автоматически устанавливается completed_at. Файл: backend/apps/projects/models.py"
-                 data-file-path="backend/apps/projects/models.py">
-                <div class="model-header" title="Модель: ProjectSheet (Проектный лист)">ProjectSheet</div>
-                <div class="model-russian-name">Проектный лист</div>
-                <div class="model-fields">
-                    <div class="field-row" data-field-prompt="id: Primary Key, автоматически создается Django">
-                        <span class="field-name field-pk">id</span>
-                        <span class="field-type">PK</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="name: Название проектного листа, необязательное поле, максимум 200 символов">
-                        <span class="field-name">name</span>
-                        <span class="field-type">CharField(200)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="description: Описание листа, необязательное поле">
-                        <span class="field-name">description</span>
-                        <span class="field-type">TextField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="project_id: ForeignKey к Project, обязательное поле, related_name='sheets', on_delete=CASCADE" data-connection="Project-ProjectSheet">
-                        <span class="field-name field-fk">project_id</span>
-                        <span class="field-type">FK → Project</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="status_id: ForeignKey к Status, необязательное поле, limit_choices_to={'status_type': 'sheet'}, related_name='project_sheets', on_delete=SET_NULL" data-connection="Status-ProjectSheet">
-                        <span class="field-name field-fk">status_id</span>
-                        <span class="field-type">FK → Status</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="is_completed: Флаг выполнения листа, по умолчанию False, при установке True автоматически устанавливается completed_at">
-                        <span class="field-name">is_completed</span>
-                        <span class="field-type">BooleanField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="completed_at: Дата выполнения листа, устанавливается автоматически при is_completed=True, очищается при is_completed=False">
-                        <span class="field-name">completed_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="file: Файл проектного листа, необязательное поле, upload_to='project_sheets/'">
-                        <span class="field-name">file</span>
-                        <span class="field-type">FileField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="executors: ManyToMany связь с User (исполнители), необязательное поле, related_name='project_sheets'" data-connection="User-ProjectSheet">
-                        <span class="field-name field-m2m">executors</span>
-                        <span class="field-type">M2M → User</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="created_at: Дата создания листа, автоматически устанавливается при создании">
-                        <span class="field-name">created_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="updated_at: Дата последнего обновления листа, автоматически обновляется при сохранении">
-                        <span class="field-name">updated_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ProjectStage Model -->
-            <div class="model-box" style="top: 600px; left: 650px;" 
-                 data-model="ProjectStage"
-                 data-prompt-info="Модель: ProjectStage (Этап проекта). Принадлежит Project через ForeignKey. Имеет Status через ForeignKey (только статусы типа 'stage'). Имеет автора (User) через ForeignKey. Сортируется по datetime (убывание). Файл: backend/apps/projects/models.py"
-                 data-file-path="backend/apps/projects/models.py">
-                <div class="model-header" title="Модель: ProjectStage (Этап проекта)">ProjectStage</div>
-                <div class="model-russian-name">Этап проекта</div>
-                <div class="model-fields">
-                    <div class="field-row" data-field-prompt="id: Primary Key, автоматически создается Django">
-                        <span class="field-name field-pk">id</span>
-                        <span class="field-type">PK</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="project_id: ForeignKey к Project, обязательное поле, related_name='stages', on_delete=CASCADE" data-connection="Project-ProjectStage">
-                        <span class="field-name field-fk">project_id</span>
-                        <span class="field-type">FK → Project</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="status_id: ForeignKey к Status, необязательное поле, limit_choices_to={'status_type': 'stage'}, related_name='project_stages', on_delete=SET_NULL" data-connection="Status-ProjectStage">
-                        <span class="field-name field-fk">status_id</span>
-                        <span class="field-type">FK → Status</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="datetime: Дата и время этапа, обязательное поле, используется для сортировки">
-                        <span class="field-name">datetime</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="author_id: ForeignKey к User (автор этапа), необязательное поле, может быть NULL, related_name='created_stages', on_delete=SET_NULL" data-connection="User-ProjectStage">
-                        <span class="field-name field-fk">author_id</span>
-                        <span class="field-type">FK → User</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="description: Описание этапа, необязательное поле">
-                        <span class="field-name">description</span>
-                        <span class="field-type">TextField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="file: Файл этапа, необязательное поле, upload_to='project_stages/'">
-                        <span class="field-name">file</span>
-                        <span class="field-type">FileField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="created_at: Дата создания этапа, автоматически устанавливается при создании">
-                        <span class="field-name">created_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ProjectSheetNote Model -->
-            <div class="model-box" style="top: 900px; left: 500px;" 
-                 data-model="ProjectSheetNote"
-                 data-prompt-info="Модель: ProjectSheetNote (Заметка проектного листа). Принадлежит ProjectSheet через ForeignKey. Имеет автора (User) через ForeignKey. Сортируется по created_at (убывание). Файл: backend/apps/projects/models.py"
-                 data-file-path="backend/apps/projects/models.py">
-                <div class="model-header" title="Модель: ProjectSheetNote (Заметка проектного листа)">ProjectSheetNote</div>
-                <div class="model-russian-name">Заметка проектного листа</div>
-                <div class="model-fields">
-                    <div class="field-row" data-field-prompt="id: Primary Key, автоматически создается Django">
-                        <span class="field-name field-pk">id</span>
-                        <span class="field-type">PK</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="name: Название заметки, обязательное поле, максимум 200 символов">
-                        <span class="field-name">name</span>
-                        <span class="field-type">CharField(200)</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="note: Текст заметки, обязательное поле">
-                        <span class="field-name">note</span>
-                        <span class="field-type">TextField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="file: Файл заметки, необязательное поле, upload_to='project_sheet_notes/'">
-                        <span class="field-name">file</span>
-                        <span class="field-type">FileField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="author_id: ForeignKey к User (автор заметки), необязательное поле, может быть NULL, related_name='project_sheet_notes', on_delete=SET_NULL" data-connection="User-ProjectSheetNote">
-                        <span class="field-name field-fk">author_id</span>
-                        <span class="field-type">FK → User</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="project_sheet_id: ForeignKey к ProjectSheet, обязательное поле, related_name='notes', on_delete=CASCADE" data-connection="ProjectSheet-ProjectSheetNote">
-                        <span class="field-name field-fk">project_sheet_id</span>
-                        <span class="field-type">FK → ProjectSheet</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="created_at: Дата создания заметки, автоматически устанавливается при создании">
-                        <span class="field-name">created_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                    <div class="field-row" data-field-prompt="updated_at: Дата последнего обновления заметки, автоматически обновляется при сохранении">
-                        <span class="field-name">updated_at</span>
-                        <span class="field-type">DateTimeField</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="legend">
-            <div class="legend-item">
-                <div class="legend-color legend-pk"></div>
-                <span>Primary Key (PK)</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color legend-fk"></div>
-                <span>Foreign Key (FK)</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color legend-m2m"></div>
-                <span>Many-to-Many (M2M)</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color legend-normal"></div>
-                <span>Обычное поле</span>
-            </div>
-        </div>
+    <div class="details-panel" id="detailsPanel">
+        <button class="close-btn" onclick="closeDetails()">×</button>
+        <div id="detailsContent"></div>
     </div>
-
-    <div class="tooltip" id="tooltip"></div>
+    <div id="network"></div>
 
     <script>
-        // Функция для получения центра элемента
-        function getCenter(element) {
-            const rect = element.getBoundingClientRect();
-            const diagram = document.getElementById('diagram');
-            const diagramRect = diagram.getBoundingClientRect();
-            return {
-                x: rect.left - diagramRect.left + rect.width / 2,
-                y: rect.top - diagramRect.top + rect.height / 2
-            };
-        }
-
-        // Функция для рисования связи
-        function drawConnection(fromModel, toModel, label, relationType = 'FK', promptInfo = '') {
-            const svg = document.getElementById('connections');
-            const fromEl = document.querySelector(`[data-model="${fromModel}"]`);
-            const toEl = document.querySelector(`[data-model="${toModel}"]`);
-            
-            if (!fromEl || !toEl) return;
-
-            const from = getCenter(fromEl);
-            const to = getCenter(toEl);
-
-            // Определяем точки входа/выхода
-            let startX = from.x;
-            let startY = from.y + 100; // Нижняя часть
-            let endX = to.x;
-            let endY = to.y - 20; // Верхняя часть
-
-            // Если связь идет влево или вправо, используем боковые стороны
-            if (Math.abs(to.x - from.x) > Math.abs(to.y - from.y)) {
-                if (to.x > from.x) {
-                    startX = from.x + 110; // Правая сторона
-                    startY = from.y;
-                    endX = to.x - 110; // Левая сторона
-                    endY = to.y;
-                } else {
-                    startX = from.x - 110; // Левая сторона
-                    startY = from.y;
-                    endX = to.x + 110; // Правая сторона
-                    endY = to.y;
-                }
+        // Данные о моделях
+        const modelsData = {
+            'Department': {
+                description: 'Отдел',
+                file: 'backend/apps/auth/models.py (7-18)',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'name', type: 'CharField', desc: 'Название', isRelation: false },
+                    { name: 'description', type: 'TextField', desc: 'Описание', isRelation: false },
+                    { name: 'color', type: 'CharField', desc: 'Цвет (HEX)', isRelation: false }
+                ],
+                relations: []
+            },
+            'UserProfile': {
+                description: 'Профиль пользователя',
+                file: 'backend/apps/auth/models.py (21-43)',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'user', type: 'OneToOneField(User)', desc: 'Пользователь', isRelation: true },
+                    { name: 'department', type: 'ForeignKey(Department)', desc: 'Отдел', isRelation: true }
+                ],
+                relations: [
+                    { field: 'user', target: 'User', type: 'OneToOne' },
+                    { field: 'department', target: 'Department', type: 'ForeignKey' }
+                ]
+            },
+            'PagePermission': {
+                description: 'Право доступа к странице для отдела',
+                file: 'backend/apps/auth/models.py (60-92)',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'page_name', type: 'CharField', desc: 'Страница', isRelation: false },
+                    { name: 'has_access', type: 'BooleanField', desc: 'Есть доступ', isRelation: false },
+                    { name: 'department', type: 'ForeignKey(Department)', desc: 'Отдел', isRelation: true }
+                ],
+                relations: [
+                    { field: 'department', target: 'Department', type: 'ForeignKey' }
+                ]
+            },
+            'Status': {
+                description: 'Модель статусов для проектных листов и этапов проекта',
+                file: 'backend/apps/projects/models.py (7-25)',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'name', type: 'CharField', desc: 'Название', isRelation: false },
+                    { name: 'color', type: 'CharField', desc: 'Цвет (HEX)', isRelation: false },
+                    { name: 'status_type', type: 'CharField', desc: 'Тип (sheet/stage)', isRelation: false },
+                    { name: 'created_at', type: 'DateTimeField', desc: 'Создан', isRelation: false }
+                ],
+                relations: []
+            },
+            'ConstructionSite': {
+                description: 'Строительный участок',
+                file: 'backend/apps/projects/models.py (28-57)',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'name', type: 'CharField', desc: 'Название', isRelation: false },
+                    { name: 'description', type: 'TextField', desc: 'Описание', isRelation: false },
+                    { name: 'manager', type: 'ForeignKey(User)', desc: 'Начальник участка', isRelation: true },
+                    { name: 'created_at', type: 'DateTimeField', desc: 'Создан', isRelation: false },
+                    { name: 'updated_at', type: 'DateTimeField', desc: 'Обновлен', isRelation: false }
+                ],
+                relations: [
+                    { field: 'manager', target: 'User', type: 'ForeignKey' }
+                ]
+            },
+            'Project': {
+                description: 'Проект',
+                file: 'backend/apps/projects/models.py (60-90)',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'name', type: 'CharField', desc: 'Название', isRelation: false },
+                    { name: 'description', type: 'TextField', desc: 'Описание', isRelation: false },
+                    { name: 'code', type: 'CharField', desc: 'Код', isRelation: false },
+                    { name: 'cipher', type: 'CharField', desc: 'Шифр', isRelation: false },
+                    { name: 'construction_site', type: 'ForeignKey(ConstructionSite)', desc: 'Строительный участок', isRelation: true },
+                    { name: 'created_at', type: 'DateTimeField', desc: 'Создан', isRelation: false },
+                    { name: 'updated_at', type: 'DateTimeField', desc: 'Обновлен', isRelation: false }
+                ],
+                relations: [
+                    { field: 'construction_site', target: 'ConstructionSite', type: 'ForeignKey' }
+                ]
+            },
+            'ProjectSheet': {
+                description: 'Проектный лист',
+                file: 'backend/apps/projects/models.py (93-154)',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'name', type: 'CharField', desc: 'Название', isRelation: false },
+                    { name: 'description', type: 'TextField', desc: 'Описание', isRelation: false },
+                    { name: 'project', type: 'ForeignKey(Project)', desc: 'Проект', isRelation: true },
+                    { name: 'status', type: 'ForeignKey(Status)', desc: 'Статус', isRelation: true },
+                    { name: 'is_completed', type: 'BooleanField', desc: 'Выполнено', isRelation: false },
+                    { name: 'completed_at', type: 'DateTimeField', desc: 'Дата выполнения', isRelation: false },
+                    { name: 'file', type: 'FileField', desc: 'Файл', isRelation: false },
+                    { name: 'executors', type: 'ManyToManyField(User)', desc: 'Исполнители', isRelation: true },
+                    { name: 'responsible_department', type: 'ForeignKey(Department)', desc: 'Ответственный отдел', isRelation: true },
+                    { name: 'created_by', type: 'ForeignKey(User)', desc: 'Инициатор', isRelation: true },
+                    { name: 'created_at', type: 'DateTimeField', desc: 'Создан', isRelation: false },
+                    { name: 'updated_at', type: 'DateTimeField', desc: 'Обновлен', isRelation: false }
+                ],
+                relations: [
+                    { field: 'project', target: 'Project', type: 'ForeignKey' },
+                    { field: 'status', target: 'Status', type: 'ForeignKey' },
+                    { field: 'executors', target: 'User', type: 'ManyToMany' },
+                    { field: 'responsible_department', target: 'Department', type: 'ForeignKey' },
+                    { field: 'created_by', target: 'User', type: 'ForeignKey' }
+                ]
+            },
+            'ProjectStage': {
+                description: 'Этап проекта',
+                file: 'backend/apps/projects/models.py (157-198)',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'project', type: 'ForeignKey(Project)', desc: 'Проект', isRelation: true },
+                    { name: 'status', type: 'ForeignKey(Status)', desc: 'Статус этапа', isRelation: true },
+                    { name: 'datetime', type: 'DateTimeField', desc: 'Дата-время', isRelation: false },
+                    { name: 'author', type: 'ForeignKey(User)', desc: 'Автор', isRelation: true },
+                    { name: 'responsible_users', type: 'ManyToManyField(User)', desc: 'Ответственные лица', isRelation: true },
+                    { name: 'description', type: 'TextField', desc: 'Описание', isRelation: false },
+                    { name: 'file', type: 'FileField', desc: 'Файл', isRelation: false },
+                    { name: 'created_at', type: 'DateTimeField', desc: 'Создан', isRelation: false }
+                ],
+                relations: [
+                    { field: 'project', target: 'Project', type: 'ForeignKey' },
+                    { field: 'status', target: 'Status', type: 'ForeignKey' },
+                    { field: 'author', target: 'User', type: 'ForeignKey' },
+                    { field: 'responsible_users', target: 'User', type: 'ManyToMany' }
+                ]
+            },
+            'ProjectSheetNote': {
+                description: 'Заметка проектного листа',
+                file: 'backend/apps/projects/models.py (201-228)',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'name', type: 'CharField', desc: 'Название', isRelation: false },
+                    { name: 'note', type: 'TextField', desc: 'Заметка', isRelation: false },
+                    { name: 'file', type: 'FileField', desc: 'Файл', isRelation: false },
+                    { name: 'author', type: 'ForeignKey(User)', desc: 'Автор', isRelation: true },
+                    { name: 'project_sheet', type: 'ForeignKey(ProjectSheet)', desc: 'Проектный лист', isRelation: true },
+                    { name: 'created_at', type: 'DateTimeField', desc: 'Создан', isRelation: false },
+                    { name: 'updated_at', type: 'DateTimeField', desc: 'Обновлен', isRelation: false }
+                ],
+                relations: [
+                    { field: 'author', target: 'User', type: 'ForeignKey' },
+                    { field: 'project_sheet', target: 'ProjectSheet', type: 'ForeignKey' }
+                ]
+            },
+            'User': {
+                description: 'Пользователь (Django)',
+                file: 'Django стандартная модель',
+                fields: [
+                    { name: 'id', type: 'AutoField', desc: 'Первичный ключ', isRelation: false },
+                    { name: 'username', type: 'CharField', desc: 'Имя пользователя', isRelation: false },
+                    { name: 'email', type: 'EmailField', desc: 'Email', isRelation: false }
+                ],
+                relations: []
             }
+        };
 
-            // Создаем путь
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const midX = (startX + endX) / 2;
-            const midY = (startY + endY) / 2;
+        // Функция для получения названия модели с полями-связями
+        function getModelLabel(modelName) {
+            const model = modelsData[modelName];
+            if (!model) return modelName;
             
-            // Кривая Безье для плавной линии
-            const dx = Math.abs(endX - startX);
-            const dy = Math.abs(endY - startY);
-            const controlOffset = Math.min(dx, dy) * 0.5;
-            
-            let d = '';
-            if (relationType === 'M2M') {
-                // Для M2M используем пунктирную линию
-                path.setAttribute('stroke-dasharray', '5,5');
-                d = `M ${startX} ${startY} Q ${startX + controlOffset} ${startY}, ${midX} ${midY} T ${endX} ${endY}`;
-            } else if (relationType === 'OneToOne') {
-                // Для OneToOne используем двойную линию
-                d = `M ${startX} ${startY} Q ${startX + controlOffset} ${startY}, ${midX} ${midY} T ${endX} ${endY}`;
-                path.setAttribute('stroke-width', '3');
-            } else {
-                d = `M ${startX} ${startY} Q ${startX + controlOffset} ${startY}, ${midX} ${midY} T ${endX} ${endY}`;
-            }
-            
-            path.setAttribute('d', d);
-            path.setAttribute('class', 'connection-line');
-            path.setAttribute('data-label', label);
-            path.setAttribute('data-from', fromModel);
-            path.setAttribute('data-to', toModel);
-            path.setAttribute('data-relation-type', relationType);
-            path.setAttribute('data-prompt-info', promptInfo || `Связь: ${fromModel} → ${toModel}. Тип: ${relationType}. ${label}`);
-            path.setAttribute('title', `Связь: ${fromModel} → ${toModel} (${label})`);
-            path.style.pointerEvents = 'stroke';
-            svg.appendChild(path);
-
-            // Добавляем метку
-            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            text.setAttribute('x', midX);
-            text.setAttribute('y', midY - 5);
-            text.setAttribute('text-anchor', 'middle');
-            text.setAttribute('class', 'connection-label');
-            text.setAttribute('font-size', '11');
-            text.setAttribute('fill', '#495057');
-            text.textContent = label;
-            text.setAttribute('data-prompt-info', promptInfo || `Связь: ${fromModel} → ${toModel}. Тип: ${relationType}. ${label}`);
-            text.setAttribute('data-from', fromModel);
-            text.setAttribute('data-to', toModel);
-            text.setAttribute('title', `Связь: ${fromModel} → ${toModel} (${label})`);
-            text.style.pointerEvents = 'all';
-            text.style.cursor = 'pointer';
-            svg.appendChild(text);
-        }
-
-        // Рисуем все связи с подсказками для промптов
-        drawConnection('User', 'UserProfile', 'OneToOne', 'OneToOne', 
-            'Связь OneToOne: User ↔ UserProfile. Один пользователь имеет один профиль. related_name="profile". Автоматически создается через сигналы post_save.');
-        drawConnection('Department', 'UserProfile', 'has users', 'FK',
-            'Связь ForeignKey: Department → UserProfile. Один отдел может иметь много пользователей. related_name="users", on_delete=SET_NULL, необязательное поле.');
-        drawConnection('User', 'ConstructionSite', 'manager', 'FK',
-            'Связь ForeignKey: User → ConstructionSite. Пользователь может управлять участками. related_name="managed_sites", on_delete=SET_NULL, необязательное поле.');
-        drawConnection('Status', 'ProjectSheet', 'status', 'FK',
-            'Связь ForeignKey: Status → ProjectSheet. Статус для проектного листа (только status_type="sheet"). related_name="project_sheets", on_delete=SET_NULL, limit_choices_to.');
-        drawConnection('Status', 'ProjectStage', 'status', 'FK',
-            'Связь ForeignKey: Status → ProjectStage. Статус для этапа проекта (только status_type="stage"). related_name="project_stages", on_delete=SET_NULL, limit_choices_to.');
-        drawConnection('ConstructionSite', 'Project', 'contains', 'FK',
-            'Связь ForeignKey: ConstructionSite → Project. Участок содержит проекты. related_name="projects", on_delete=CASCADE, обязательное поле.');
-        drawConnection('Project', 'ProjectSheet', 'has sheets', 'FK',
-            'Связь ForeignKey: Project → ProjectSheet. Проект содержит проектные листы. related_name="sheets", on_delete=CASCADE, обязательное поле.');
-        drawConnection('Project', 'ProjectStage', 'has stages', 'FK',
-            'Связь ForeignKey: Project → ProjectStage. Проект имеет этапы. related_name="stages", on_delete=CASCADE, обязательное поле.');
-        drawConnection('ProjectSheet', 'ProjectSheetNote', 'has notes', 'FK',
-            'Связь ForeignKey: ProjectSheet → ProjectSheetNote. Проектный лист содержит заметки. related_name="notes", on_delete=CASCADE, обязательное поле.');
-        drawConnection('User', 'ProjectSheet', 'executors', 'M2M',
-            'Связь ManyToMany: User ↔ ProjectSheet. Пользователи могут быть исполнителями многих листов. related_name="project_sheets", необязательное поле.');
-        drawConnection('User', 'ProjectStage', 'author', 'FK',
-            'Связь ForeignKey: User → ProjectStage. Пользователь создает этапы. related_name="created_stages", on_delete=SET_NULL, необязательное поле.');
-        drawConnection('User', 'ProjectSheetNote', 'author', 'FK',
-            'Связь ForeignKey: User → ProjectSheetNote. Пользователь создает заметки. related_name="project_sheet_notes", on_delete=SET_NULL, необязательное поле.');
-
-        // Функция для подсветки связанных полей
-        function highlightConnectionFields(fromModel, toModel) {
-            // Находим все поля, связанные с этой связью
-            const connectionKey = `${fromModel}-${toModel}`;
-            const reverseKey = `${toModel}-${fromModel}`;
-            
-            document.querySelectorAll('.field-row').forEach(row => {
-                const connection = row.dataset.connection;
-                if (connection === connectionKey || connection === reverseKey) {
-                    row.classList.add('highlighted');
-                }
-            });
-            
-            // Подсвечиваем саму связь (линию и текст)
-            document.querySelectorAll('.connection-line').forEach(path => {
-                const from = path.dataset.from || '';
-                const to = path.dataset.to || '';
-                if ((from === fromModel && to === toModel) || (from === toModel && to === fromModel)) {
-                    path.classList.add('highlighted');
-                    // Находим соответствующий текст по позиции
-                    const svg = document.getElementById('connections');
-                    const texts = svg.querySelectorAll('text');
-                    const pathMidX = path.getAttribute('d').match(/M\s+[\d.]+/)?.[0]?.split(/\s+/)?.[1];
-                    texts.forEach(text => {
-                        const textX = parseFloat(text.getAttribute('x') || 0);
-                        const pathX = parseFloat(pathMidX || 0);
-                        // Проверяем близость позиций
-                        if (Math.abs(textX - pathX) < 50 || text.textContent === path.dataset.label) {
-                            const textFrom = text.getAttribute('data-from') || '';
-                            const textTo = text.getAttribute('data-to') || '';
-                            if ((textFrom === fromModel && textTo === toModel) || 
-                                (textFrom === toModel && textTo === fromModel) ||
-                                (!textFrom && !textTo)) {
-                                text.classList.add('highlighted');
-                            }
-                        }
-                    });
-                }
-            });
-        }
-
-        // Функция для снятия подсветки
-        function clearHighlight() {
-            document.querySelectorAll('.field-row.highlighted').forEach(row => {
-                row.classList.remove('highlighted');
-            });
-            document.querySelectorAll('.connection-line.highlighted, text.connection-label.highlighted').forEach(conn => {
-                conn.classList.remove('highlighted');
-            });
-        }
-
-        // Добавляем подсказки при наведении
-        document.querySelectorAll('.model-box, .connection-line, .field-row, text').forEach(el => {
-            el.addEventListener('mouseenter', function(e) {
-                const tooltip = document.getElementById('tooltip');
-                let text = '';
-                
-                if (this.classList && this.classList.contains('model-box')) {
-                    text = `${this.dataset.promptInfo || `Модель: ${this.dataset.model}`}\n\nФайл: ${this.dataset.filePath || 'N/A'}\n\nКликните для копирования информации в промпт`;
-                } else if (this.classList && this.classList.contains('connection-line')) {
-                    const from = this.dataset.from;
-                    const to = this.dataset.to;
-                    highlightConnectionFields(from, to);
-                    text = this.dataset.promptInfo || `Связь: ${from} → ${to}\nТип: ${this.dataset.relationType || 'FK'}\n${this.dataset.label}`;
-                } else if (this.classList && this.classList.contains('field-row')) {
-                    const fieldName = this.querySelector('.field-name').textContent;
-                    const fieldType = this.querySelector('.field-type').textContent;
-                    text = this.dataset.fieldPrompt || `Поле: ${fieldName}\nТип: ${fieldType}`;
-                } else if (this.tagName === 'text' && this.dataset.promptInfo) {
-                    // Для текстовых меток связей
-                    const from = this.dataset.from || '';
-                    const to = this.dataset.to || '';
-                    if (from && to) {
-                        highlightConnectionFields(from, to);
-                    }
-                    text = this.dataset.promptInfo;
-                }
-                
-                if (text) {
-                    tooltip.textContent = text;
-                    tooltip.style.display = 'block';
-                    tooltip.style.left = e.pageX + 10 + 'px';
-                    tooltip.style.top = e.pageY + 10 + 'px';
-                }
-            });
-
-            el.addEventListener('mouseleave', function() {
-                document.getElementById('tooltip').style.display = 'none';
-                clearHighlight();
-            });
-
-            el.addEventListener('mousemove', function(e) {
-                const tooltip = document.getElementById('tooltip');
-                if (tooltip.style.display === 'block') {
-                    tooltip.style.left = e.pageX + 10 + 'px';
-                    tooltip.style.top = e.pageY + 10 + 'px';
-                }
-            });
-        });
-
-        // Переменная для отслеживания перетаскивания
-        let hasDragged = false;
-
-        // Функция для копирования информации модели
-        function copyModelInfo(box) {
-            const model = box.dataset.model;
-            const promptInfo = box.dataset.promptInfo || '';
-            const filePath = box.dataset.filePath || '';
-            
-            // Формируем текст для промпта
-            let promptText = `Модель: ${model}\n`;
-            if (filePath) {
-                promptText += `Файл: ${filePath}\n`;
-            }
-            if (promptInfo) {
-                promptText += `\nОписание:\n${promptInfo}\n`;
-            }
-            
-            // Получаем информацию о полях
-            const fields = [];
-            box.querySelectorAll('.field-row').forEach(row => {
-                const fieldName = row.querySelector('.field-name').textContent;
-                const fieldType = row.querySelector('.field-type').textContent;
-                const fieldPrompt = row.dataset.fieldPrompt || '';
-                fields.push(`- ${fieldName} (${fieldType})${fieldPrompt ? ': ' + fieldPrompt : ''}`);
-            });
-            
-            if (fields.length > 0) {
-                promptText += `\nПоля:\n${fields.join('\n')}`;
-            }
-            
-            // Копируем в буфер обмена
-            navigator.clipboard.writeText(promptText).then(() => {
-                alert(`Информация о модели ${model} скопирована в буфер обмена!\n\nИспользуйте её в промпте.`);
-            }).catch(() => {
-                // Если не удалось скопировать, показываем в alert
-                prompt(`Информация о модели ${model}:\n\n${promptText}\n\nСкопируйте эту информацию для использования в промпте.`);
-            });
-            
-            console.log('Информация для промпта:', promptText);
-        }
-
-        // Клик по модели для копирования информации в промпт (только если не было перетаскивания)
-        document.querySelectorAll('.model-box').forEach(box => {
-            box.addEventListener('click', function(e) {
-                // Проверяем, что это был клик, а не окончание перетаскивания
-                if (!hasDragged) {
-                    copyModelInfo(this);
-                }
-            });
-        });
-        
-        // Клик по связи для копирования информации
-        document.querySelectorAll('.connection-line, text.connection-label').forEach(conn => {
-            conn.addEventListener('click', function() {
-                const promptInfo = this.dataset.promptInfo || '';
-                const from = this.dataset.from || this.getAttribute('data-from') || '';
-                const to = this.dataset.to || this.getAttribute('data-to') || '';
-                const label = this.dataset.label || this.textContent || '';
-                
-                let promptText = `Связь: ${from} → ${to}\n`;
-                promptText += `Метка: ${label}\n`;
-                if (promptInfo) {
-                    promptText += `\nОписание:\n${promptInfo}`;
-                }
-                
-                navigator.clipboard.writeText(promptText).then(() => {
-                    alert(`Информация о связи скопирована в буфер обмена!`);
-                }).catch(() => {
-                    prompt(`Информация о связи:\n\n${promptText}\n\nСкопируйте эту информацию для использования в промпте.`);
+            let label = modelName;
+            if (model.relations.length > 0) {
+                label += '\n─────────────';
+                model.relations.forEach(rel => {
+                    label += `\n• ${rel.field} → ${rel.target}`;
                 });
-            });
-        });
-
-        // Функционал перетаскивания моделей
-        let isDragging = false;
-        let currentBox = null;
-        let offsetX = 0;
-        let offsetY = 0;
-        let startX = 0;
-        let startY = 0;
-
-        // Функция для перерисовки всех связей
-        function redrawAllConnections() {
-            const svg = document.getElementById('connections');
-            // Очищаем все связи
-            svg.innerHTML = '<defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><polygon points="0 0, 10 3, 0 6" fill="#6c757d" /></marker></defs>';
-            
-            // Перерисовываем все связи
-            drawConnection('User', 'UserProfile', 'OneToOne', 'OneToOne', 
-                'Связь OneToOne: User ↔ UserProfile. Один пользователь имеет один профиль. related_name="profile". Автоматически создается через сигналы post_save.');
-            drawConnection('Department', 'UserProfile', 'has users', 'FK',
-                'Связь ForeignKey: Department → UserProfile. Один отдел может иметь много пользователей. related_name="users", on_delete=SET_NULL, необязательное поле.');
-            drawConnection('User', 'ConstructionSite', 'manager', 'FK',
-                'Связь ForeignKey: User → ConstructionSite. Пользователь может управлять участками. related_name="managed_sites", on_delete=SET_NULL, необязательное поле.');
-            drawConnection('Status', 'ProjectSheet', 'status', 'FK',
-                'Связь ForeignKey: Status → ProjectSheet. Статус для проектного листа (только status_type="sheet"). related_name="project_sheets", on_delete=SET_NULL, limit_choices_to.');
-            drawConnection('Status', 'ProjectStage', 'status', 'FK',
-                'Связь ForeignKey: Status → ProjectStage. Статус для этапа проекта (только status_type="stage"). related_name="project_stages", on_delete=SET_NULL, limit_choices_to.');
-            drawConnection('ConstructionSite', 'Project', 'contains', 'FK',
-                'Связь ForeignKey: ConstructionSite → Project. Участок содержит проекты. related_name="projects", on_delete=CASCADE, обязательное поле.');
-            drawConnection('Project', 'ProjectSheet', 'has sheets', 'FK',
-                'Связь ForeignKey: Project → ProjectSheet. Проект содержит проектные листы. related_name="sheets", on_delete=CASCADE, обязательное поле.');
-            drawConnection('Project', 'ProjectStage', 'has stages', 'FK',
-                'Связь ForeignKey: Project → ProjectStage. Проект имеет этапы. related_name="stages", on_delete=CASCADE, обязательное поле.');
-            drawConnection('ProjectSheet', 'ProjectSheetNote', 'has notes', 'FK',
-                'Связь ForeignKey: ProjectSheet → ProjectSheetNote. Проектный лист содержит заметки. related_name="notes", on_delete=CASCADE, обязательное поле.');
-            drawConnection('User', 'ProjectSheet', 'executors', 'M2M',
-                'Связь ManyToMany: User ↔ ProjectSheet. Пользователи могут быть исполнителями многих листов. related_name="project_sheets", необязательное поле.');
-            drawConnection('User', 'ProjectStage', 'author', 'FK',
-                'Связь ForeignKey: User → ProjectStage. Пользователь создает этапы. related_name="created_stages", on_delete=SET_NULL, необязательное поле.');
-            drawConnection('User', 'ProjectSheetNote', 'author', 'FK',
-                'Связь ForeignKey: User → ProjectSheetNote. Пользователь создает заметки. related_name="project_sheet_notes", on_delete=SET_NULL, необязательное поле.');
+            }
+            return label;
         }
 
-        // Загрузка сохраненных позиций из localStorage
-        function loadPositions() {
-            const saved = localStorage.getItem('modelPositions');
-            if (saved) {
-                try {
-                    const positions = JSON.parse(saved);
-                    document.querySelectorAll('.model-box').forEach(box => {
-                        const model = box.dataset.model;
-                        if (positions[model]) {
-                            box.style.top = positions[model].top + 'px';
-                            box.style.left = positions[model].left + 'px';
-                        }
-                    });
-                } catch (e) {
-                    console.error('Ошибка загрузки позиций:', e);
+        // Функция для отображения всех полей
+        function showDetails(modelName) {
+            const model = modelsData[modelName];
+            if (!model) return;
+
+            const panel = document.getElementById('detailsPanel');
+            const content = document.getElementById('detailsContent');
+            
+            let html = `<h3>${modelName}</h3>`;
+            html += `<div class="description">${model.description}</div>`;
+            html += `<div style="margin-bottom: 10px; font-size: 12px; color: #81d4fa;">Файл: ${model.file}</div>`;
+            html += '<div style="margin-top: 15px;"><strong>Все поля:</strong></div>';
+            
+            model.fields.forEach(field => {
+                html += `
+                    <div class="field">
+                        <div class="field-name">${field.name}</div>
+                        <div class="field-type">${field.type}</div>
+                        <div class="field-desc">${field.desc}</div>
+                    </div>
+                `;
+            });
+            
+            content.innerHTML = html;
+            panel.classList.add('show');
+        }
+
+        function closeDetails() {
+            document.getElementById('detailsPanel').classList.remove('show');
+        }
+
+        // Создание узлов
+        const nodes = new vis.DataSet([
+            { id: 1, label: getModelLabel('User'), shape: 'box', color: { background: '#81d4fa', border: '#4fc3f7' }, model: 'User' },
+            { id: 2, label: getModelLabel('Department'), shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, model: 'Department' },
+            { id: 3, label: getModelLabel('UserProfile'), shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, model: 'UserProfile' },
+            { id: 4, label: getModelLabel('PagePermission'), shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, model: 'PagePermission' },
+            { id: 5, label: getModelLabel('Status'), shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, model: 'Status' },
+            { id: 6, label: getModelLabel('ConstructionSite'), shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, model: 'ConstructionSite' },
+            { id: 7, label: getModelLabel('Project'), shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, model: 'Project' },
+            { id: 8, label: getModelLabel('ProjectSheet'), shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, model: 'ProjectSheet' },
+            { id: 9, label: getModelLabel('ProjectStage'), shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, model: 'ProjectStage' },
+            { id: 10, label: getModelLabel('ProjectSheetNote'), shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, model: 'ProjectSheetNote' }
+        ]);
+
+        // Создание рёбер (связи между моделями)
+        const edges = new vis.DataSet([
+            // UserProfile связи
+            { from: 3, to: 1, arrows: 'to', label: 'user', color: { color: '#4fc3f7' } },
+            { from: 3, to: 2, arrows: 'to', label: 'department', color: { color: '#4fc3f7' } },
+            // PagePermission связи
+            { from: 4, to: 2, arrows: 'to', label: 'department', color: { color: '#4fc3f7' } },
+            // ConstructionSite связи
+            { from: 6, to: 1, arrows: 'to', label: 'manager', color: { color: '#4fc3f7' } },
+            // Project связи
+            { from: 7, to: 6, arrows: 'to', label: 'construction_site', color: { color: '#4fc3f7' } },
+            // ProjectSheet связи
+            { from: 8, to: 7, arrows: 'to', label: 'project', color: { color: '#4fc3f7' } },
+            { from: 8, to: 5, arrows: 'to', label: 'status', color: { color: '#4fc3f7' } },
+            { from: 8, to: 1, arrows: 'to', label: 'executors', color: { color: '#ff9800' }, dashes: true },
+            { from: 8, to: 1, arrows: 'to', label: 'created_by', color: { color: '#4fc3f7' } },
+            { from: 8, to: 2, arrows: 'to', label: 'responsible_department', color: { color: '#4fc3f7' } },
+            // ProjectStage связи
+            { from: 9, to: 7, arrows: 'to', label: 'project', color: { color: '#4fc3f7' } },
+            { from: 9, to: 5, arrows: 'to', label: 'status', color: { color: '#4fc3f7' } },
+            { from: 9, to: 1, arrows: 'to', label: 'author', color: { color: '#4fc3f7' } },
+            { from: 9, to: 1, arrows: 'to', label: 'responsible_users', color: { color: '#ff9800' }, dashes: true },
+            // ProjectSheetNote связи
+            { from: 10, to: 8, arrows: 'to', label: 'project_sheet', color: { color: '#4fc3f7' } },
+            { from: 10, to: 1, arrows: 'to', label: 'author', color: { color: '#4fc3f7' } }
+        ]);
+
+        // Данные для визуализации
+        const data = {
+            nodes: nodes,
+            edges: edges
+        };
+
+        // Настройки
+        const options = {
+            nodes: {
+                shape: 'box',
+                font: {
+                    size: 12,
+                    face: 'Segoe UI',
+                    bold: true,
+                    align: 'left'
+                },
+                borderWidth: 2,
+                shadow: true,
+                margin: 10,
+                widthConstraint: {
+                    minimum: 200,
+                    maximum: 280
+                }
+            },
+            edges: {
+                arrows: {
+                    to: {
+                        enabled: true,
+                        scaleFactor: 1.2
+                    }
+                },
+                font: {
+                    size: 11,
+                    align: 'middle',
+                    background: 'white',
+                    strokeWidth: 2,
+                    strokeColor: 'white'
+                },
+                color: {
+                    color: '#4fc3f7',
+                    highlight: '#29b6f6'
+                },
+                smooth: {
+                    type: 'continuous',
+                    roundness: 0.5
+                }
+            },
+            layout: {
+                hierarchical: {
+                    enabled: true,
+                    direction: 'UD',
+                    sortMethod: 'directed',
+                    levelSeparation: 240,
+                    nodeSpacing: 300,
+                    treeSpacing: 450,
+                    blockShifting: true,
+                    edgeMinimization: true,
+                    parentCentralization: true
+                }
+            },
+            physics: {
+                enabled: false
+            },
+            interaction: {
+                zoomView: true,
+                dragView: true,
+                dragNodes: true,
+                selectConnectedEdges: false
+            }
+        };
+
+        // Создание сети
+        const container = document.getElementById('network');
+        const network = new vis.Network(container, data, options);
+
+        // Обработка двойного клика на узел для показа деталей
+        network.on('doubleClick', function(params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const node = nodes.get(nodeId);
+                if (node.model) {
+                    showDetails(node.model);
                 }
             }
-        }
+        });
 
-        // Сохранение позиций в localStorage
-        function savePositions() {
-            const positions = {};
-            document.querySelectorAll('.model-box').forEach(box => {
-                const model = box.dataset.model;
-                const rect = box.getBoundingClientRect();
-                const diagram = document.getElementById('diagram');
-                const diagramRect = diagram.getBoundingClientRect();
-                positions[model] = {
-                    top: rect.top - diagramRect.top,
-                    left: rect.left - diagramRect.left
-                };
-            });
-            localStorage.setItem('modelPositions', JSON.stringify(positions));
-        }
+        // Обработка клика на стрелку (ребро)
+        network.on('click', function(params) {
+            if (params.edges.length > 0) {
+                const edgeId = params.edges[0];
+                const edge = edges.get(edgeId);
+                const node = nodes.get(edge.to);
+                if (node.model) {
+                    showDetails(node.model);
+                }
+            }
+        });
 
-        // Обработчики для перетаскивания
-        document.querySelectorAll('.model-box').forEach(box => {
-            const header = box.querySelector('.model-header');
-            let dragStartX = 0;
-            let dragStartY = 0;
-            
-            // Начало перетаскивания
-            header.addEventListener('mousedown', function(e) {
-                hasDragged = false;
-                isDragging = true;
-                currentBox = box;
-                currentBox.classList.add('dragging');
-                
-                const rect = box.getBoundingClientRect();
-                const diagram = document.getElementById('diagram');
-                const diagramRect = diagram.getBoundingClientRect();
-                
-                offsetX = e.clientX - rect.left;
-                offsetY = e.clientY - rect.top;
-                startX = rect.left - diagramRect.left;
-                startY = rect.top - diagramRect.top;
-                dragStartX = e.clientX;
-                dragStartY = e.clientY;
-                
-                e.preventDefault();
+        // Подсветка при наведении
+        network.on('hoverNode', function(params) {
+            container.style.cursor = 'pointer';
+        });
+
+        network.on('blurNode', function() {
+            container.style.cursor = 'default';
+        });
+
+        // Автоматическое масштабирование при загрузке
+        network.on('stabilizationEnd', function() {
+            network.fit({
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
             });
         });
 
-        // Перемещение при перетаскивании
-        document.addEventListener('mousemove', function(e) {
-            if (!isDragging || !currentBox) return;
-            
-            // Проверяем, было ли реальное перемещение (больше 5 пикселей)
-            const moveX = Math.abs(e.clientX - (currentBox._dragStartX || e.clientX));
-            const moveY = Math.abs(e.clientY - (currentBox._dragStartY || e.clientY));
-            
-            if (moveX > 5 || moveY > 5) {
-                hasDragged = true;
-            }
-            
-            if (!currentBox._dragStartX) {
-                currentBox._dragStartX = e.clientX;
-                currentBox._dragStartY = e.clientY;
-            }
-            
-            const diagram = document.getElementById('diagram');
-            const diagramRect = diagram.getBoundingClientRect();
-            
-            let newX = e.clientX - diagramRect.left - offsetX;
-            let newY = e.clientY - diagramRect.top - offsetY;
-            
-            // Ограничиваем перемещение в пределах диаграммы
-            const boxWidth = currentBox.offsetWidth;
-            const boxHeight = currentBox.offsetHeight;
-            const diagramWidth = diagram.offsetWidth;
-            const diagramHeight = diagram.offsetHeight;
-            
-            newX = Math.max(0, Math.min(newX, diagramWidth - boxWidth));
-            newY = Math.max(0, Math.min(newY, diagramHeight - boxHeight));
-            
-            currentBox.style.left = newX + 'px';
-            currentBox.style.top = newY + 'px';
-            
-            // Перерисовываем связи в реальном времени
-            redrawAllConnections();
-        });
-
-        // Окончание перетаскивания
-        document.addEventListener('mouseup', function(e) {
-            if (isDragging && currentBox) {
-                currentBox.classList.remove('dragging');
-                savePositions();
-                redrawAllConnections();
-                
-                // Сбрасываем флаг перетаскивания через небольшую задержку
-                setTimeout(() => {
-                    hasDragged = false;
-                }, 100);
-                
-                // Очищаем временные данные
-                currentBox._dragStartX = null;
-                currentBox._dragStartY = null;
-                isDragging = false;
-                currentBox = null;
+        // Закрытие панели при клике вне её
+        document.addEventListener('click', function(event) {
+            const panel = document.getElementById('detailsPanel');
+            if (panel.classList.contains('show') && !panel.contains(event.target)) {
+                // Проверяем, что клик не на узле сети
+                if (!event.target.closest('#network')) {
+                    closeDetails();
+                }
             }
         });
-
-        // Загружаем сохраненные позиции при загрузке страницы
-        window.addEventListener('load', function() {
-            loadPositions();
-            // Небольшая задержка для корректного перерисовывания связей
-            setTimeout(redrawAllConnections, 100);
-        });
-
     </script>
 </body>
 </html>
-
