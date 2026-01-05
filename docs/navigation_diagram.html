@@ -82,31 +82,31 @@
         // Узлы
         const nodes = new vis.DataSet([
             { id: 1, label: 'НАЧАЛО', shape: 'ellipse', color: { background: '#4fc3f7', border: '#29b6f6' }, font: { size: 16, bold: true } },
-            { id: 2, label: 'AuthWrapper\nПроверка токена', shape: 'box', color: { background: '#81d4fa', border: '#4fc3f7' }, file: nodeFileMap['AuthWrapper'] },
+            { id: 2, label: 'Проверка авторизации\n(AuthWrapper)', shape: 'box', color: { background: '#81d4fa', border: '#4fc3f7' }, file: nodeFileMap['AuthWrapper'] },
             { id: 3, label: 'Токен\nесть?', shape: 'diamond', color: { background: '#ff9800', border: '#f57c00' } },
-            { id: 4, label: 'LoginScreen\nЭкран входа', shape: 'box', color: { background: '#ef5350', border: '#e53935' }, file: nodeFileMap['LoginScreen'] },
+            { id: 4, label: 'Экран входа\n(LoginScreen)', shape: 'box', color: { background: '#ef5350', border: '#e53935' }, file: nodeFileMap['LoginScreen'] },
             { id: 5, label: 'Успешный\nвход?', shape: 'diamond', color: { background: '#ff9800', border: '#f57c00' } },
             { id: 6, label: 'Ошибка входа', shape: 'box', color: { background: '#b0bec5', border: '#90a4ae' } },
             { id: 7, label: 'Кнопка\nРегистрация', shape: 'box', color: { background: '#b0bec5', border: '#90a4ae' } },
-            { id: 8, label: 'RegisterScreen\nЭкран регистрации', shape: 'box', color: { background: '#ef5350', border: '#e53935' }, file: nodeFileMap['RegisterScreen'] },
+            { id: 8, label: 'Экран регистрации\n(RegisterScreen)', shape: 'box', color: { background: '#ef5350', border: '#e53935' }, file: nodeFileMap['RegisterScreen'] },
             { id: 9, label: 'Успешная\nрегистрация?', shape: 'diamond', color: { background: '#ff9800', border: '#f57c00' } },
             { id: 10, label: 'Ошибка регистрации', shape: 'box', color: { background: '#b0bec5', border: '#90a4ae' } },
-            { id: 11, label: 'HomeScreen\nГлавная страница', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['HomeScreen'] },
+            { id: 11, label: 'Главная страница\n(HomeScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['HomeScreen'] },
             { id: 12, label: 'Внутренняя\nнавигация', shape: 'diamond', color: { background: '#ff9800', border: '#f57c00' } },
-            { id: 13, label: 'HomeContent', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['HomeContent'] },
-            { id: 14, label: 'TasksScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['TasksScreen'] },
-            { id: 15, label: 'ProjectsListScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectsListScreen'] },
-            { id: 16, label: 'SettingsScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['SettingsScreen'] },
+            { id: 13, label: 'Главная\n(HomeContent)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['HomeContent'] },
+            { id: 14, label: 'Задачи\n(TasksScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['TasksScreen'] },
+            { id: 15, label: 'Список проектов\n(ProjectsListScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectsListScreen'] },
+            { id: 16, label: 'Настройки\n(SettingsScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['SettingsScreen'] },
             { id: 17, label: 'Кнопка Выход', shape: 'box', color: { background: '#b0bec5', border: '#90a4ae' } },
-            { id: 18, label: 'ProjectIdScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectIdScreen'] },
-            { id: 19, label: 'ProjectMaterialsScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectMaterialsScreen'] },
-            { id: 20, label: 'ProjectWorksScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectWorksScreen'] },
-            { id: 21, label: 'SiteProjectsScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['SiteProjectsScreen'] },
-            { id: 22, label: 'ProjectDetailScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectDetailScreen'] },
-            { id: 23, label: 'UsersListScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['UsersListScreen'] },
-            { id: 24, label: 'DepartmentsListScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['DepartmentsListScreen'] },
-            { id: 25, label: 'AccessPermissionsScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['AccessPermissionsScreen'] },
-            { id: 26, label: 'StatusesListScreen', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['StatusesListScreen'] }
+            { id: 18, label: 'ИД проектов\n(ProjectIdScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectIdScreen'] },
+            { id: 19, label: 'Материалы\n(ProjectMaterialsScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectMaterialsScreen'] },
+            { id: 20, label: 'Работы\n(ProjectWorksScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectWorksScreen'] },
+            { id: 21, label: 'Проекты участка\n(SiteProjectsScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['SiteProjectsScreen'] },
+            { id: 22, label: 'Детали проекта\n(ProjectDetailScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['ProjectDetailScreen'] },
+            { id: 23, label: 'Список пользователей\n(UsersListScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['UsersListScreen'] },
+            { id: 24, label: 'Список отделов\n(DepartmentsListScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['DepartmentsListScreen'] },
+            { id: 25, label: 'Права доступа\n(AccessPermissionsScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['AccessPermissionsScreen'] },
+            { id: 26, label: 'Список статусов\n(StatusesListScreen)', shape: 'box', color: { background: '#66bb6a', border: '#4caf50' }, file: nodeFileMap['StatusesListScreen'] }
         ]);
 
         // Рёбра
@@ -152,7 +152,7 @@
             nodes: {
                 shape: 'box',
                 font: {
-                    size: 14,
+                    size: 15,
                     face: 'Segoe UI',
                     bold: true
                 },

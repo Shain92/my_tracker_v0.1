@@ -2,9 +2,17 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/app_models.dart';
+import '../models/user_model.dart';
 import '../widgets/project_form_dialog.dart';
 import '../widgets/progress_bars.dart' as progress_bars;
 import 'project_detail_screen.dart';
+
+/// Фильтр по статусу выполнения
+enum CompletionFilter {
+  all,
+  completed,
+  incomplete,
+}
 
 /// Экран проектов строительного участка
 class SiteProjectsScreen extends StatefulWidget {
@@ -23,11 +31,27 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
   List<ProjectModel> _projects = [];
   bool _isLoading = true;
   String? _errorMessage;
+  
+  // Сводная статистика
+  double? _averageCompletionPercentage;
+  List<progress_bars.DepartmentCompletionStats> _summaryDepartmentStats = [];
+  bool _isLoadingSummaryStats = false;
+  
+  // Фильтрация
+  List<DepartmentModel> _departments = [];
+  Map<int, int> _departmentTotalSheets = {}; // departmentId -> total sheets
+  Map<int, int> _departmentIncompleteSheets = {}; // departmentId -> incomplete sheets
+  Map<int, Set<int>> _departmentProjects = {}; // departmentId -> Set of projectIds
+  int? _selectedDepartmentId;
+  CompletionFilter _completionFilter = CompletionFilter.all;
+  bool _isLoadingDepartments = false;
 
   @override
   void initState() {
     super.initState();
     _loadProjects();
+    _loadDepartments();
+    _loadSummaryStats();
   }
 
   /// Загрузка проектов участка
@@ -64,6 +88,285 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
   /// Обновление списка
   Future<void> _refreshProjects() async {
     await _loadProjects();
+    _loadSummaryStats();
+    _loadDepartments();
+  }
+
+  /// Загрузка сводной статистики по всем проектам
+  Future<void> _loadSummaryStats() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingSummaryStats = true;
+      });
+    }
+
+    try {
+      // Вычисляем средний процент выполнения
+      double totalPercentage = 0.0;
+      int projectsWithPercentage = 0;
+      for (final project in _projects) {
+        if (project.completionPercentage != null) {
+          totalPercentage += project.completionPercentage!;
+          projectsWithPercentage++;
+        }
+      }
+      final averagePercentage = projectsWithPercentage > 0
+          ? totalPercentage / projectsWithPercentage
+          : 0.0;
+
+      // Агрегируем статистику по отделам из всех проектов
+      final Map<int, progress_bars.DepartmentCompletionStats> statsMap = {};
+      final Map<int, Set<int>> departmentProjects = {}; // departmentId -> Set of projectIds
+      int totalIncompleteSheets = 0;
+
+      for (final project in _projects) {
+        int currentPage = 1;
+        bool hasMore = true;
+
+        while (hasMore && mounted) {
+          final result = await ApiService.getProjectSheets(
+            project.id,
+            page: currentPage,
+            pageSize: 100,
+          );
+
+          if (result['success'] == true) {
+            final data = result['data'];
+            if (data is List) {
+              final pageSheets = data
+                  .map((s) => ProjectSheetModel.fromJson(s as Map<String, dynamic>))
+                  .toList();
+
+              for (final sheet in pageSheets) {
+                if (sheet.responsibleDepartment != null) {
+                  final deptId = sheet.responsibleDepartment!.id;
+
+                  // Сохраняем информацию о проекте для отдела
+                  if (!departmentProjects.containsKey(deptId)) {
+                    departmentProjects[deptId] = <int>{};
+                  }
+                  departmentProjects[deptId]!.add(project.id);
+
+                  if (!statsMap.containsKey(deptId)) {
+                    statsMap[deptId] = progress_bars.DepartmentCompletionStats(
+                      departmentId: deptId,
+                      departmentName: sheet.responsibleDepartment!.name,
+                      departmentColor: sheet.responsibleDepartment!.color,
+                      totalSheets: 0,
+                      completedSheets: 0,
+                      incompleteSheets: 0,
+                      completionPercentage: 0.0,
+                      incompletePercentage: 0.0,
+                    );
+                  }
+
+                  final stats = statsMap[deptId]!;
+                  final isCompleted = sheet.isCompleted;
+                  final isIncomplete = !isCompleted;
+
+                  statsMap[deptId] = progress_bars.DepartmentCompletionStats(
+                    departmentId: stats.departmentId,
+                    departmentName: stats.departmentName,
+                    departmentColor: stats.departmentColor,
+                    totalSheets: stats.totalSheets + 1,
+                    completedSheets: stats.completedSheets + (isCompleted ? 1 : 0),
+                    incompleteSheets: stats.incompleteSheets + (isIncomplete ? 1 : 0),
+                    completionPercentage: 0.0,
+                    incompletePercentage: 0.0,
+                  );
+
+                  if (isIncomplete) {
+                    totalIncompleteSheets++;
+                  }
+                }
+              }
+            }
+
+            final pagination = result['pagination'] as Map<String, dynamic>?;
+            if (pagination != null) {
+              hasMore = pagination['hasNext'] == true;
+              currentPage++;
+            } else {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+      }
+
+      // Вычисляем проценты
+      final List<progress_bars.DepartmentCompletionStats> statsList = [];
+      for (final stats in statsMap.values) {
+        final completionPercentage = stats.totalSheets > 0
+            ? (stats.completedSheets / stats.totalSheets) * 100
+            : 0.0;
+
+        final incompletePercentage = totalIncompleteSheets > 0
+            ? (stats.incompleteSheets / totalIncompleteSheets) * 100
+            : 0.0;
+
+        statsList.add(progress_bars.DepartmentCompletionStats(
+          departmentId: stats.departmentId,
+          departmentName: stats.departmentName,
+          departmentColor: stats.departmentColor,
+          totalSheets: stats.totalSheets,
+          completedSheets: stats.completedSheets,
+          incompleteSheets: stats.incompleteSheets,
+          completionPercentage: completionPercentage,
+          incompletePercentage: incompletePercentage,
+        ));
+      }
+
+      statsList.sort((a, b) => b.incompleteSheets.compareTo(a.incompleteSheets));
+
+      if (mounted) {
+        setState(() {
+          _averageCompletionPercentage = averagePercentage;
+          _summaryDepartmentStats = statsList;
+          _departmentProjects = departmentProjects;
+          _isLoadingSummaryStats = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _averageCompletionPercentage = null;
+          _summaryDepartmentStats = [];
+          _isLoadingSummaryStats = false;
+        });
+      }
+    }
+  }
+
+  /// Загрузка отделов и подсчет статистики
+  Future<void> _loadDepartments() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingDepartments = true;
+      });
+    }
+
+    try {
+      final result = await ApiService.getDepartments();
+      if (mounted && result['success'] == true) {
+        final data = result['data'] as List;
+        final departments = data
+            .map((d) => DepartmentModel.fromJson(d as Map<String, dynamic>))
+            .toList();
+
+        // Подсчитываем статистику по отделам
+        final Map<int, int> totalSheets = {};
+        final Map<int, int> incompleteSheets = {};
+
+        for (final project in _projects) {
+          int currentPage = 1;
+          bool hasMore = true;
+
+          while (hasMore && mounted) {
+            final result = await ApiService.getProjectSheets(
+              project.id,
+              page: currentPage,
+              pageSize: 100,
+            );
+
+            if (result['success'] == true) {
+              final data = result['data'];
+              if (data is List) {
+                final pageSheets = data
+                    .map((s) => ProjectSheetModel.fromJson(s as Map<String, dynamic>))
+                    .toList();
+
+                for (final sheet in pageSheets) {
+                  if (sheet.responsibleDepartment != null) {
+                    final deptId = sheet.responsibleDepartment!.id;
+                    totalSheets[deptId] = (totalSheets[deptId] ?? 0) + 1;
+                    if (!sheet.isCompleted) {
+                      incompleteSheets[deptId] = (incompleteSheets[deptId] ?? 0) + 1;
+                    }
+                  }
+                }
+              }
+
+              final pagination = result['pagination'] as Map<String, dynamic>?;
+              if (pagination != null) {
+                hasMore = pagination['hasNext'] == true;
+                currentPage++;
+              } else {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false;
+            }
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _departments = departments;
+            _departmentTotalSheets = totalSheets;
+            _departmentIncompleteSheets = incompleteSheets;
+            _isLoadingDepartments = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoadingDepartments = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDepartments = false;
+        });
+      }
+    }
+  }
+
+  /// Получить отфильтрованные проекты
+  List<ProjectModel> _getFilteredProjects() {
+    // Если проекты еще не загружены, возвращаем пустой список
+    if (_projects.isEmpty) {
+      return [];
+    }
+
+    // Начинаем со всех проектов
+    List<ProjectModel> filtered = List.from(_projects);
+
+    // Фильтр по статусу выполнения
+    if (_completionFilter == CompletionFilter.completed) {
+      filtered = filtered.where((project) {
+        final percentage = project.completionPercentage;
+        // Проект выполнен, если процент равен 100
+        return percentage != null && (percentage >= 100.0 || percentage >= 99.9);
+      }).toList();
+    } else if (_completionFilter == CompletionFilter.incomplete) {
+      filtered = filtered.where((project) {
+        final percentage = project.completionPercentage;
+        // Проект не выполнен, если процент меньше 100 или null
+        return percentage == null || percentage < 99.9;
+      }).toList();
+    }
+    // Если _completionFilter == CompletionFilter.all, не фильтруем
+
+    // Фильтр по отделу
+    if (_selectedDepartmentId != null) {
+      // Применяем фильтр только если данные загружены
+      if (!_isLoadingSummaryStats && _departmentProjects.isNotEmpty) {
+        final projectIds = _departmentProjects[_selectedDepartmentId];
+        if (projectIds != null && projectIds.isNotEmpty) {
+          filtered = filtered.where((project) => projectIds.contains(project.id)).toList();
+        } else {
+          // Если у отдела нет проектов, возвращаем пустой список
+          filtered = [];
+        }
+      }
+      // Если данные еще загружаются, показываем все проекты (отфильтрованные по статусу)
+    }
+
+    return filtered;
   }
 
   /// Обновление одного проекта в списке
@@ -256,6 +559,9 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
       );
     }
 
+    final filteredProjects = _getFilteredProjects();
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return RefreshIndicator(
       onRefresh: _refreshProjects,
       child: _projects.isEmpty
@@ -279,19 +585,424 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
                 ],
               ),
             )
-          : ListView.builder(
-              padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 16),
-              itemCount: _projects.length,
-              itemBuilder: (context, index) {
-                return _ProjectCard(
-                  project: _projects[index],
-                  constructionSite: widget.constructionSite,
-                  onRefresh: () => _refreshProjects(),
-                  onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
-                );
-              },
+          : ListView(
+              padding: EdgeInsets.all(isMobile ? 12 : 16),
+              children: [
+                _buildSummaryBlock(isMobile),
+                const SizedBox(height: 16),
+                _buildFiltersBlock(isMobile),
+                const SizedBox(height: 16),
+                if (filteredProjects.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.filter_alt_off,
+                            size: 64,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Нет проектов, соответствующих фильтрам',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 16,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ...filteredProjects.map((project) => _ProjectCard(
+                        project: project,
+                        constructionSite: widget.constructionSite,
+                        onRefresh: () => _refreshProjects(),
+                        onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                      )),
+              ],
             ),
     );
+  }
+
+  /// Сводный блок статистики
+  Widget _buildSummaryBlock(bool isMobile) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.analytics,
+                color: AppColors.accentBlue,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Сводная информация',
+                style: TextStyle(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (isMobile) ...[
+            progress_bars.OverallProgressBar(
+              completionPercentage: _averageCompletionPercentage,
+              compact: false,
+            ),
+            const SizedBox(height: 16),
+            progress_bars.DepartmentProgressBar(
+              departmentStats: _summaryDepartmentStats,
+              isLoading: _isLoadingSummaryStats,
+              compact: false,
+              showLegend: true,
+            ),
+          ] else ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: progress_bars.OverallProgressBar(
+                    completionPercentage: _averageCompletionPercentage,
+                    compact: false,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: progress_bars.DepartmentProgressBar(
+                    departmentStats: _summaryDepartmentStats,
+                    isLoading: _isLoadingSummaryStats,
+                    compact: false,
+                    showLegend: true,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Блок фильтров
+  Widget _buildFiltersBlock(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCompletionFilter(isMobile),
+        const SizedBox(height: 12),
+        _buildDepartmentFilter(isMobile),
+      ],
+    );
+  }
+
+  /// Фильтр по статусу выполнения
+  Widget _buildCompletionFilter(bool isMobile) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.filter_list,
+            color: AppColors.accentBlue,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Статус:',
+            style: TextStyle(
+              fontSize: isMobile ? 14 : 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(width: 16),
+          _buildFilterIcon(
+            icon: Icons.filter_list,
+            label: 'Все',
+            isSelected: _completionFilter == CompletionFilter.all,
+            onTap: () {
+              setState(() {
+                _completionFilter = CompletionFilter.all;
+              });
+            },
+          ),
+          const SizedBox(width: 12),
+          _buildFilterIcon(
+            icon: Icons.check_circle,
+            label: 'Выполнено',
+            isSelected: _completionFilter == CompletionFilter.completed,
+            onTap: () {
+              setState(() {
+                _completionFilter = CompletionFilter.completed;
+              });
+            },
+          ),
+          const SizedBox(width: 12),
+          _buildFilterIcon(
+            icon: Icons.cancel,
+            label: 'Не выполнено',
+            isSelected: _completionFilter == CompletionFilter.incomplete,
+            onTap: () {
+              setState(() {
+                _completionFilter = CompletionFilter.incomplete;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Иконка фильтра
+  Widget _buildFilterIcon({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.accentBlue.withOpacity(0.3)
+              : AppColors.cardBackground.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.accentBlue : AppColors.borderColor.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? AppColors.accentBlue : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? AppColors.accentBlue : AppColors.textSecondary,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Фильтр по отделам
+  Widget _buildDepartmentFilter(bool isMobile) {
+    if (_isLoadingDepartments) {
+      return Container(
+        padding: EdgeInsets.all(isMobile ? 12 : 16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.borderColor.withOpacity(0.3),
+          ),
+        ),
+        child: const Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text(
+              'Загрузка отделов...',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.business,
+                color: AppColors.accentBlue,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Фильтр по отделам:',
+                style: TextStyle(
+                  fontSize: isMobile ? 14 : 16,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              // Кнопка "Все отделы"
+              _buildDepartmentChip(
+                department: null,
+                isSelected: _selectedDepartmentId == null,
+                onTap: () {
+                  setState(() {
+                    _selectedDepartmentId = null;
+                  });
+                },
+              ),
+              // Отделы
+              ..._departments.map((dept) {
+                final totalSheets = _departmentTotalSheets[dept.id] ?? 0;
+                final incompleteSheets = _departmentIncompleteSheets[dept.id] ?? 0;
+                final deptId = dept.id;
+                return _buildDepartmentChip(
+                  department: dept,
+                  totalSheets: totalSheets,
+                  incompleteSheets: incompleteSheets,
+                  isSelected: _selectedDepartmentId == deptId,
+                  onTap: () {
+                    setState(() {
+                      _selectedDepartmentId = deptId;
+                    });
+                  },
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Чип отдела
+  Widget _buildDepartmentChip({
+    DepartmentModel? department,
+    int totalSheets = 0,
+    int incompleteSheets = 0,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final color = department != null
+        ? _parseColor(department.color)
+        : AppColors.textSecondary;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withOpacity(0.3)
+              : AppColors.cardBackground.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : AppColors.borderColor.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (department != null) ...[
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              department?.name ?? 'Все отделы',
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? color : AppColors.textSecondary,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+            if (department != null && totalSheets > 0) ...[
+              const SizedBox(width: 6),
+              Text(
+                '($totalSheets/$incompleteSheets)',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isSelected ? color.withOpacity(0.8) : AppColors.textSecondary.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Преобразование HEX цвета в Color
+  Color _parseColor(String hexColor) {
+    try {
+      if (hexColor.isEmpty) {
+        return AppColors.textSecondary;
+      }
+      String hex = hexColor.trim().replaceAll('#', '').toUpperCase();
+      if (hex.length == 6) {
+        return Color(int.parse('FF$hex', radix: 16));
+      } else if (hex.length == 8) {
+        return Color(int.parse(hex, radix: 16));
+      } else if (hex.length == 3) {
+        final r = hex[0];
+        final g = hex[1];
+        final b = hex[2];
+        hex = '$r$r$g$g$b$b';
+        return Color(int.parse('FF$hex', radix: 16));
+      }
+    } catch (e) {
+      // Если не удалось распарсить, возвращаем цвет по умолчанию
+    }
+    return AppColors.textSecondary;
   }
 }
 
