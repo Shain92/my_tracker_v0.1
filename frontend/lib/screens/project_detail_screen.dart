@@ -1,9 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../theme/app_theme.dart';
 import '../models/app_models.dart';
 import '../services/api_service.dart';
 import '../widgets/project_stage_form_dialog.dart';
 import '../widgets/project_sheet_form_dialog.dart';
+
+/// Статистика выполнения по отделу
+class DepartmentCompletionStats {
+  final int departmentId;
+  final String departmentName;
+  final String departmentColor;
+  final int totalSheets;
+  final int completedSheets;
+  final int incompleteSheets; // Невыполненные листы
+  final double completionPercentage;
+  final double incompletePercentage; // Процент невыполненных листов от общего количества невыполненных
+
+  DepartmentCompletionStats({
+    required this.departmentId,
+    required this.departmentName,
+    required this.departmentColor,
+    required this.totalSheets,
+    required this.completedSheets,
+    required this.incompleteSheets,
+    required this.completionPercentage,
+    required this.incompletePercentage,
+  });
+}
 
 /// Экран деталей проекта
 class ProjectDetailScreen extends StatefulWidget {
@@ -21,6 +46,9 @@ class ProjectDetailScreen extends StatefulWidget {
 class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   bool _isLoading = true;
   int? _currentUserId;
+  bool _isLoadingDepartmentStats = false;
+  List<DepartmentCompletionStats> _departmentStats = [];
+  ProjectModel? _currentProject;
   
   // Ключи для независимых виджетов колонок
   final GlobalKey<_StagesColumnWidgetState> _stagesKey = GlobalKey<_StagesColumnWidgetState>();
@@ -29,8 +57,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _currentProject = widget.project;
     _loadCurrentUser();
     _loadData();
+    _loadDepartmentStats();
   }
 
   /// Загрузка текущего пользователя
@@ -57,6 +87,273 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  /// Обновление проекта с сервера
+  Future<void> _updateProject() async {
+    try {
+      final result = await ApiService.getProject(widget.project.id);
+      if (mounted && result['success'] == true) {
+        final projectData = result['data'] as Map<String, dynamic>;
+        setState(() {
+          _currentProject = ProjectModel.fromJson(projectData);
+        });
+      }
+    } catch (e) {
+      // Игнорируем ошибки при обновлении
+    }
+  }
+
+  /// Загрузка статистики по отделам
+  Future<void> _loadDepartmentStats() async {
+    // #region agent log
+    _debugLog('project_detail_screen.dart:108', '_loadDepartmentStats entry', {'projectId': widget.project.id}, 'A,C,E');
+    // #endregion
+    
+    if (mounted) {
+      setState(() {
+        _isLoadingDepartmentStats = true;
+      });
+    }
+
+    try {
+      // Загружаем все листы проекта, проходя по всем страницам
+      List<ProjectSheetModel> allSheets = [];
+      int currentPage = 1;
+      bool hasMore = true;
+      
+      while (hasMore && mounted) {
+        final result = await ApiService.getProjectSheets(
+          widget.project.id,
+          page: currentPage,
+          pageSize: 100, // Загружаем по 100 листов за раз
+        );
+
+        // #region agent log
+        _debugLog('project_detail_screen.dart:121', 'API response received', {
+          'success': result['success'],
+          'hasData': result.containsKey('data'),
+          'pagination': result['pagination'],
+          'currentPage': currentPage,
+        }, 'A,C');
+        // #endregion
+
+        if (result['success'] == true) {
+          final data = result['data'];
+          
+          if (data is List) {
+            final pageSheets = data
+                .map((s) => ProjectSheetModel.fromJson(s as Map<String, dynamic>))
+                .toList();
+            allSheets.addAll(pageSheets);
+          }
+          
+          final pagination = result['pagination'] as Map<String, dynamic>?;
+          if (pagination != null) {
+            hasMore = pagination['hasNext'] == true;
+            currentPage++;
+          } else {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // #region agent log
+      _debugLog('project_detail_screen.dart:149', 'All pages loaded', {
+        'totalSheets': allSheets.length,
+        'totalPages': currentPage - 1,
+      }, 'A,C');
+      // #endregion
+
+      if (mounted) {
+
+        // #region agent log
+        _debugLog('project_detail_screen.dart:133', 'Sheets parsed', {
+          'totalSheets': allSheets.length,
+          'sheetsWithDept': allSheets.where((s) => s.responsibleDepartment != null).length,
+          'sheetsWithoutDept': allSheets.where((s) => s.responsibleDepartment == null).length,
+        }, 'B,E');
+        // #endregion
+
+        // Группируем невыполненные листы по отделам
+        final Map<int, DepartmentCompletionStats> statsMap = {};
+        int totalIncompleteSheets = 0;
+        final Set<int> seenDeptIds = {};
+        
+        for (final sheet in allSheets) {
+          // #region agent log
+          _debugLog('project_detail_screen.dart:145', 'Processing sheet', {
+            'sheetId': sheet.id,
+            'hasDept': sheet.responsibleDepartment != null,
+            'deptId': sheet.responsibleDepartment?.id,
+            'deptName': sheet.responsibleDepartment?.name,
+            'isCompleted': sheet.isCompleted,
+          }, 'B,D');
+          // #endregion
+          
+          if (sheet.responsibleDepartment != null) {
+            final deptId = sheet.responsibleDepartment!.id;
+            
+            if (!statsMap.containsKey(deptId)) {
+              seenDeptIds.add(deptId);
+              // #region agent log
+              _debugLog('project_detail_screen.dart:151', 'New department found', {
+                'deptId': deptId,
+                'deptName': sheet.responsibleDepartment!.name,
+                'deptColor': sheet.responsibleDepartment!.color,
+              }, 'D');
+              // #endregion
+              
+              statsMap[deptId] = DepartmentCompletionStats(
+                departmentId: deptId,
+                departmentName: sheet.responsibleDepartment!.name,
+                departmentColor: sheet.responsibleDepartment!.color,
+                totalSheets: 0,
+                completedSheets: 0,
+                incompleteSheets: 0,
+                completionPercentage: 0.0,
+                incompletePercentage: 0.0,
+              );
+            }
+            
+            final stats = statsMap[deptId]!;
+            final isCompleted = sheet.isCompleted;
+            final isIncomplete = !isCompleted;
+            
+            statsMap[deptId] = DepartmentCompletionStats(
+              departmentId: stats.departmentId,
+              departmentName: stats.departmentName,
+              departmentColor: stats.departmentColor,
+              totalSheets: stats.totalSheets + 1,
+              completedSheets: stats.completedSheets + (isCompleted ? 1 : 0),
+              incompleteSheets: stats.incompleteSheets + (isIncomplete ? 1 : 0),
+              completionPercentage: 0.0, // Вычислим ниже
+              incompletePercentage: 0.0, // Вычислим ниже
+            );
+            
+            if (isIncomplete) {
+              totalIncompleteSheets++;
+            }
+          }
+        }
+
+        // #region agent log
+        _debugLog('project_detail_screen.dart:187', 'After grouping departments', {
+          'totalDepartments': statsMap.length,
+          'deptIds': seenDeptIds.toList(),
+          'deptNames': statsMap.values.map((s) => s.departmentName).toList(),
+          'totalIncompleteSheets': totalIncompleteSheets,
+        }, 'B,D');
+        // #endregion
+
+        // Вычисляем проценты
+        final List<DepartmentCompletionStats> statsList = [];
+        for (final stats in statsMap.values) {
+          // Процент выполнения отдела
+          final completionPercentage = stats.totalSheets > 0
+              ? (stats.completedSheets / stats.totalSheets) * 100
+              : 0.0;
+          
+          // Процент невыполненных листов отдела от общего количества невыполненных
+          final incompletePercentage = totalIncompleteSheets > 0
+              ? (stats.incompleteSheets / totalIncompleteSheets) * 100
+              : 0.0;
+          
+          // Добавляем все отделы, которые есть в проектных листах
+          statsList.add(DepartmentCompletionStats(
+            departmentId: stats.departmentId,
+            departmentName: stats.departmentName,
+            departmentColor: stats.departmentColor,
+            totalSheets: stats.totalSheets,
+            completedSheets: stats.completedSheets,
+            incompleteSheets: stats.incompleteSheets,
+            completionPercentage: completionPercentage,
+            incompletePercentage: incompletePercentage,
+          ));
+        }
+
+        // Сортируем по количеству невыполненных листов (по убыванию)
+        statsList.sort((a, b) => b.incompleteSheets.compareTo(a.incompleteSheets));
+
+        // #region agent log
+        _debugLog('project_detail_screen.dart:213', 'Final stats list', {
+          'finalCount': statsList.length,
+          'deptIds': statsList.map((s) => s.departmentId).toList(),
+          'deptNames': statsList.map((s) => s.departmentName).toList(),
+          'incompleteCounts': statsList.map((s) => s.incompleteSheets).toList(),
+        }, 'A,B,C,D,E');
+        // #endregion
+
+        if (mounted) {
+          setState(() {
+            _departmentStats = statsList;
+            _isLoadingDepartmentStats = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _departmentStats = [];
+            _isLoadingDepartmentStats = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _departmentStats = [];
+          _isLoadingDepartmentStats = false;
+        });
+      }
+    }
+  }
+
+  /// Вспомогательная функция для логирования отладки
+  void _debugLog(String location, String message, Map<String, dynamic> data, String hypothesisId) {
+    try {
+      final logData = {
+        'location': location,
+        'message': message,
+        'data': data,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'sessionId': 'debug-session',
+        'runId': 'run1',
+        'hypothesisId': hypothesisId,
+      };
+      http.post(
+        Uri.parse('http://127.0.0.1:7246/ingest/24c3c77a-8ab3-4ae6-afd3-7e3aad7b1941'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(logData),
+      ).catchError((_) => http.Response('', 500));
+    } catch (e) {
+      // Игнорируем ошибки логирования
+    }
+  }
+
+  /// Преобразование HEX цвета в Color
+  Color _parseColor(String hexColor) {
+    try {
+      if (hexColor.isEmpty) {
+        return AppColors.textSecondary;
+      }
+      String hex = hexColor.trim().replaceAll('#', '').toUpperCase();
+      if (hex.length == 6) {
+        return Color(int.parse('FF$hex', radix: 16));
+      } else if (hex.length == 8) {
+        return Color(int.parse(hex, radix: 16));
+      } else if (hex.length == 3) {
+        final r = hex[0];
+        final g = hex[1];
+        final b = hex[2];
+        hex = '$r$r$g$g$b$b';
+        return Color(int.parse('FF$hex', radix: 16));
+      }
+    } catch (e) {
+      // Если не удалось распарсить, возвращаем цвет по умолчанию
+    }
+    return AppColors.textSecondary;
   }
 
   @override
@@ -217,24 +514,50 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             ),
           ],
           const SizedBox(height: 12),
-          // Процент выполнения
-          Row(
-            children: [
-              const Icon(
-                Icons.trending_up,
-                color: AppColors.accentGreen,
-                size: 20,
+          // Процент выполнения и выполнение по отделам
+          if (isMobile) ...[
+            // На мобильных: вертикальная раскладка
+            _buildOverallProgress(),
+            const SizedBox(height: 12),
+            _buildDepartmentProgressBar(isMobile),
+          ] else ...[
+            // На десктопе: горизонтальная раскладка
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildOverallProgress()),
+                const SizedBox(width: 16),
+                Expanded(child: _buildDepartmentProgressBar(isMobile)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Общая шкала выполнения
+  Widget _buildOverallProgress() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.trending_up,
+              color: AppColors.accentGreen,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Выполнение: ',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
               ),
-              const SizedBox(width: 8),
-              const Text(
-                'Выполнение: ',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
-              ),
+            ),
               Text(
-                '${widget.project.completionPercentage?.toStringAsFixed(1) ?? 0.0}%',
+                '${(_currentProject?.completionPercentage ?? widget.project.completionPercentage)?.toStringAsFixed(1) ?? 0.0}%',
                 style: const TextStyle(
                   color: AppColors.accentGreen,
                   fontSize: 16,
@@ -245,15 +568,302 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           ),
           const SizedBox(height: 8),
           LinearProgressIndicator(
-            value: (widget.project.completionPercentage ?? 0.0) / 100,
-            backgroundColor: AppColors.backgroundSecondary,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentGreen),
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(4),
+            value: ((_currentProject?.completionPercentage ?? widget.project.completionPercentage) ?? 0.0) / 100,
+          backgroundColor: AppColors.backgroundSecondary,
+          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentGreen),
+          minHeight: 8,
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ],
+    );
+  }
+
+  /// Шкала выполнения по отделам
+  Widget _buildDepartmentProgressBar(bool isMobile) {
+    if (_isLoadingDepartmentStats) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.business,
+                color: AppColors.accentBlue,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'По отделам: ',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const SizedBox(
+            height: 8,
+            child: LinearProgressIndicator(),
           ),
         ],
-      ),
+      );
+    }
+
+    if (_departmentStats.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.business,
+                color: AppColors.accentBlue,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'По отделам: ',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Нет данных по отделам',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.business,
+              color: AppColors.accentBlue,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Невыполненные листы по отделам: ',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Горизонтальная шкала с сегментами невыполненных листов
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final totalWidth = constraints.maxWidth;
+            
+            // #region agent log
+            _debugLog('project_detail_screen.dart:643', 'LayoutBuilder entry', {
+              'totalWidth': totalWidth,
+              'totalDepartments': _departmentStats.length,
+            }, 'A,B,D');
+            // #endregion
+            
+            // Вычисляем общее количество невыполненных листов
+            final totalIncompleteSheets = _departmentStats.fold<int>(
+              0,
+              (sum, stats) => sum + stats.incompleteSheets,
+            );
+            
+            // #region agent log
+            _debugLog('project_detail_screen.dart:650', 'Total incomplete sheets calculated', {
+              'totalIncompleteSheets': totalIncompleteSheets,
+              'departmentStats': _departmentStats.map((s) => {
+                'id': s.departmentId,
+                'name': s.departmentName,
+                'incomplete': s.incompleteSheets,
+              }).toList(),
+            }, 'A,C');
+            // #endregion
+            
+            if (totalIncompleteSheets == 0) {
+              // Если нет невыполненных листов, показываем сообщение
+              return Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundSecondary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Center(
+                  child: Text(
+                    'Все листы выполнены',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              );
+            }
+            
+            // Фильтруем отделы с невыполненными листами для отображения на шкале
+            final departmentsWithIncomplete = _departmentStats
+                .where((stats) => stats.incompleteSheets > 0)
+                .toList();
+            
+            // #region agent log
+            _debugLog('project_detail_screen.dart:675', 'Departments with incomplete filtered', {
+              'departmentsWithIncompleteCount': departmentsWithIncomplete.length,
+              'departmentsWithIncomplete': departmentsWithIncomplete.map((s) => {
+                'id': s.departmentId,
+                'name': s.departmentName,
+                'incomplete': s.incompleteSheets,
+              }).toList(),
+            }, 'A,B');
+            // #endregion
+            
+            if (departmentsWithIncomplete.isEmpty) {
+              return Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundSecondary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Center(
+                  child: Text(
+                    'Все листы выполнены',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              );
+            }
+            
+            // Вычисляем ширины всех сегментов
+            final segmentWidths = <double>[];
+            double totalSegmentWidth = 0.0;
+            
+            for (final stats in departmentsWithIncomplete) {
+              final segmentWidth = (stats.incompleteSheets / totalIncompleteSheets) * totalWidth;
+              segmentWidths.add(segmentWidth);
+              totalSegmentWidth += segmentWidth;
+            }
+            
+            // #region agent log
+            _debugLog('project_detail_screen.dart:710', 'Segment widths calculated', {
+              'totalWidth': totalWidth,
+              'totalIncompleteSheets': totalIncompleteSheets,
+              'segmentWidths': segmentWidths,
+              'totalSegmentWidth': totalSegmentWidth,
+              'difference': totalWidth - totalSegmentWidth,
+              'segmentCount': departmentsWithIncomplete.length,
+            }, 'A,B');
+            // #endregion
+            
+            return Container(
+              height: 8,
+              decoration: BoxDecoration(
+                color: AppColors.backgroundSecondary,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                children: departmentsWithIncomplete.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final stats = entry.value;
+                  final color = _parseColor(stats.departmentColor);
+                  
+                  // Используем предвычисленную ширину
+                  final segmentWidth = segmentWidths[index];
+                  
+                  return Container(
+                    width: segmentWidth,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: _getBorderRadiusForSegment(
+                        index,
+                        departmentsWithIncomplete.length,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            );
+          },
+        ),
+        // Легенда с названиями всех отделов, количеством и процентами невыполненных листов
+        if (!isMobile) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: _departmentStats.map((stats) {
+              final color = _parseColor(stats.departmentColor);
+              final totalIncomplete = _departmentStats.fold<int>(
+                0,
+                (sum, s) => sum + s.incompleteSheets,
+              );
+              
+              // Показываем процент только если есть невыполненные листы
+              final percentageText = totalIncomplete > 0
+                  ? ' (${stats.incompletePercentage.toStringAsFixed(1)}%)'
+                  : '';
+              
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${stats.departmentName}: ${stats.incompleteSheets}$percentageText',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ],
+      ],
     );
+  }
+
+  /// Получение скругления углов для сегмента
+  BorderRadius _getBorderRadiusForSegment(int index, int total) {
+    if (total == 1) {
+      return BorderRadius.circular(4);
+    }
+    
+    if (index == 0) {
+      return const BorderRadius.only(
+        topLeft: Radius.circular(4),
+        bottomLeft: Radius.circular(4),
+      );
+    } else if (index == total - 1) {
+      return const BorderRadius.only(
+        topRight: Radius.circular(4),
+        bottomRight: Radius.circular(4),
+      );
+    } else {
+      return BorderRadius.zero;
+    }
   }
 
   /// Строка информации
@@ -329,7 +939,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       projectId: widget.project.id,
       isMobile: isMobile,
       currentUserId: _currentUserId,
-      onSheetAdded: () {},
+      onSheetAdded: () {
+        // Обновляем статистику по отделам при изменении листов
+        _loadDepartmentStats();
+      },
+      onProjectUpdated: _updateProject,
     );
   }
 }
@@ -583,6 +1197,52 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+              if (stage.responsibleUsers != null && stage.responsibleUsers!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: stage.responsibleUsers!.map((user) {
+                    final departmentColor = user.department?.color ?? '#808080';
+                    final userName = user.firstName != null && user.lastName != null
+                        ? '${user.firstName} ${user.lastName}'
+                        : user.username;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _parseColor(departmentColor).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _parseColor(departmentColor).withOpacity(0.5),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _parseColor(departmentColor),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            userName,
+                            style: TextStyle(
+                              color: _parseColor(departmentColor),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
             ],
           ),
         ),
@@ -677,6 +1337,7 @@ class _SheetsColumnWidget extends StatefulWidget {
   final bool isMobile;
   final int? currentUserId;
   final VoidCallback onSheetAdded;
+  final VoidCallback? onProjectUpdated;
 
   const _SheetsColumnWidget({
     super.key,
@@ -684,6 +1345,7 @@ class _SheetsColumnWidget extends StatefulWidget {
     required this.isMobile,
     this.currentUserId,
     required this.onSheetAdded,
+    this.onProjectUpdated,
   });
 
   @override
@@ -901,6 +1563,7 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
                               if (result['success'] == true) {
                                 refresh();
                                 widget.onSheetAdded();
+                                widget.onProjectUpdated?.call();
                               }
                             }
                           : null,
@@ -944,6 +1607,43 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
                                 ),
                               ),
                             ],
+                          ),
+                        ],
+                        if (sheet.responsibleDepartment != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.business,
+                                size: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  sheet.responsibleDepartment!.name,
+                                  style: TextStyle(
+                                    color: _parseColor(sheet.responsibleDepartment!.color),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (sheet.description != null && sheet.description!.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            sheet.description!,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ],

@@ -768,6 +768,50 @@ class ApiService {
     }
   }
 
+  /// Получение проекта по ID
+  static Future<Map<String, dynamic>> getProject(int id) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      var response = await http.get(
+        Uri.parse('$baseUrl/projects/projects/$id/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            response = await http.get(
+              Uri.parse('$baseUrl/projects/projects/$id/'),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            );
+          }
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data};
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Ошибка получения проекта'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
   /// Создание проекта
   static Future<Map<String, dynamic>> createProject(Map<String, dynamic> data) async {
     try {
@@ -941,6 +985,50 @@ class ApiService {
       } else {
         final error = jsonDecode(response.body);
         return {'success': false, 'error': error['error'] ?? 'Ошибка получения списка участков'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
+  /// Получение строительного участка по ID
+  static Future<Map<String, dynamic>> getConstructionSite(int id) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      var response = await http.get(
+        Uri.parse('$baseUrl/projects/construction-sites/$id/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            response = await http.get(
+              Uri.parse('$baseUrl/projects/construction-sites/$id/'),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            );
+          }
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data};
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Ошибка получения участка'};
       }
     } catch (e) {
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};

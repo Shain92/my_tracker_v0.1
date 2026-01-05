@@ -53,6 +53,16 @@ class _ProjectIdScreenState extends State<ProjectIdScreen> {
     await _loadConstructionSites();
   }
 
+  /// Обновление одного участка в списке
+  void _updateConstructionSite(ConstructionSiteModel updatedSite) {
+    setState(() {
+      final index = _constructionSites.indexWhere((s) => s.id == updatedSite.id);
+      if (index != -1) {
+        _constructionSites[index] = updatedSite;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -243,6 +253,7 @@ class _ProjectIdScreenState extends State<ProjectIdScreen> {
                 return _ConstructionSiteCard(
                   constructionSite: _constructionSites[index],
                   onRefresh: () => _refreshConstructionSites(),
+                  onConstructionSiteUpdated: (updatedSite) => _updateConstructionSite(updatedSite),
                 );
               },
             ),
@@ -254,10 +265,12 @@ class _ProjectIdScreenState extends State<ProjectIdScreen> {
 class _ConstructionSiteCard extends StatelessWidget {
   final ConstructionSiteModel constructionSite;
   final VoidCallback? onRefresh;
+  final Function(ConstructionSiteModel)? onConstructionSiteUpdated;
 
   const _ConstructionSiteCard({
     required this.constructionSite,
     this.onRefresh,
+    this.onConstructionSiteUpdated,
   });
 
   @override
@@ -265,8 +278,8 @@ class _ConstructionSiteCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => SiteProjectsScreen(
@@ -274,6 +287,20 @@ class _ConstructionSiteCard extends StatelessWidget {
               ),
             ),
           );
+          
+          // Обновляем участок после возврата из экрана проектов
+          if (onConstructionSiteUpdated != null) {
+            try {
+              final siteResult = await ApiService.getConstructionSite(constructionSite.id);
+              if (siteResult['success'] == true) {
+                final siteData = siteResult['data'] as Map<String, dynamic>;
+                final updatedSite = ConstructionSiteModel.fromJson(siteData);
+                onConstructionSiteUpdated!(updatedSite);
+              }
+            } catch (e) {
+              // Игнорируем ошибки при обновлении
+            }
+          }
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(

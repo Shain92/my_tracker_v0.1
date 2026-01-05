@@ -65,6 +65,16 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
     await _loadProjects();
   }
 
+  /// Обновление одного проекта в списке
+  void _updateProject(ProjectModel updatedProject) {
+    setState(() {
+      final index = _projects.indexWhere((p) => p.id == updatedProject.id);
+      if (index != -1) {
+        _projects[index] = updatedProject;
+      }
+    });
+  }
+
   /// Показать диалог добавления проекта
   Future<void> _showAddProjectDialog(BuildContext context) async {
     final result = await showDialog(
@@ -276,6 +286,7 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
                   project: _projects[index],
                   constructionSite: widget.constructionSite,
                   onRefresh: () => _refreshProjects(),
+                  onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
                 );
               },
             ),
@@ -288,11 +299,13 @@ class _ProjectCard extends StatelessWidget {
   final ProjectModel project;
   final ConstructionSiteModel constructionSite;
   final VoidCallback? onRefresh;
+  final Function(ProjectModel)? onProjectUpdated;
 
   const _ProjectCard({
     required this.project,
     required this.constructionSite,
     this.onRefresh,
+    this.onProjectUpdated,
   });
 
   @override
@@ -300,8 +313,8 @@ class _ProjectCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ProjectDetailScreen(
@@ -309,6 +322,20 @@ class _ProjectCard extends StatelessWidget {
               ),
             ),
           );
+          
+          // Обновляем проект после возврата из детального экрана
+          if (onProjectUpdated != null) {
+            try {
+              final projectResult = await ApiService.getProject(project.id);
+              if (projectResult['success'] == true) {
+                final projectData = projectResult['data'] as Map<String, dynamic>;
+                final updatedProject = ProjectModel.fromJson(projectData);
+                onProjectUpdated!(updatedProject);
+              }
+            } catch (e) {
+              // Игнорируем ошибки при обновлении
+            }
+          }
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(
