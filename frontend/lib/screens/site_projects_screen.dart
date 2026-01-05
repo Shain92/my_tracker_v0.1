@@ -51,7 +51,6 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
     super.initState();
     _loadProjects();
     _loadDepartments();
-    _loadSummaryStats();
   }
 
   /// Загрузка проектов участка
@@ -82,6 +81,8 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
           _errorMessage = result['error'] ?? 'Ошибка загрузки проектов';
         }
       });
+      // Загружаем статистику после загрузки проектов
+      _loadSummaryStats();
     }
   }
 
@@ -618,6 +619,7 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
                   )
                 else
                   ...filteredProjects.map((project) => _ProjectCard(
+                        key: ValueKey(project.id),
                         project: project,
                         constructionSite: widget.constructionSite,
                         onRefresh: () => _refreshProjects(),
@@ -1014,6 +1016,7 @@ class _ProjectCard extends StatefulWidget {
   final Function(ProjectModel)? onProjectUpdated;
 
   const _ProjectCard({
+    super.key,
     required this.project,
     required this.constructionSite,
     this.onRefresh,
@@ -1069,6 +1072,7 @@ class _ProjectCardState extends State<_ProjectCard> {
   }
 
   /// Загрузка статистики по отделам
+  /// Загружает полные данные проекта независимо от фильтров на странице
   Future<void> _loadDepartmentStats() async {
     if (mounted) {
       setState(() {
@@ -1081,6 +1085,9 @@ class _ProjectCardState extends State<_ProjectCard> {
       int currentPage = 1;
       bool hasMore = true;
       
+      // Загружаем все листы проекта напрямую из API
+      // Это гарантирует, что карточка показывает полные данные проекта,
+      // независимо от фильтров на странице
       while (hasMore && mounted) {
         final result = await ApiService.getProjectSheets(
           widget.project.id,
