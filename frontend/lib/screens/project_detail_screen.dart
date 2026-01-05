@@ -24,7 +24,19 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   List<ProjectStageModel> _stages = [];
   List<ProjectSheetModel> _sheets = [];
   bool _isLoading = true;
+  bool _isLoadingStages = false;
+  bool _isLoadingSheets = false;
   int? _currentUserId;
+  
+  // Пагинация для этапов
+  int _stagesCurrentPage = 1;
+  int _stagesTotalPages = 1;
+  int _stagesTotalCount = 0;
+  
+  // Пагинация для листов
+  int _sheetsCurrentPage = 1;
+  int _sheetsTotalPages = 1;
+  int _sheetsTotalCount = 0;
 
   @override
   void initState() {
@@ -50,8 +62,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     });
 
     await Future.wait([
-      _loadStages(),
-      _loadSheets(),
+      _loadStages(showLoading: false),
+      _loadSheets(showLoading: false),
     ]);
 
     if (mounted) {
@@ -62,32 +74,148 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   }
 
   /// Загрузка этапов
-  Future<void> _loadStages() async {
-    final result = await ApiService.getProjectStages(widget.project.id);
-    if (mounted && result['success'] == true) {
-      setState(() {
-        _stages = (result['data'] as List)
-            .map((s) => ProjectStageModel.fromJson(s as Map<String, dynamic>))
-            .toList();
-      });
+  Future<void> _loadStages({int? page, bool showLoading = true}) async {
+    try {
+      final currentPage = page ?? _stagesCurrentPage;
+      
+      if (showLoading && mounted) {
+        setState(() {
+          _isLoadingStages = true;
+        });
+      }
+      
+      final result = await ApiService.getProjectStages(
+        widget.project.id,
+        page: currentPage,
+        pageSize: 5,
+      );
+      if (mounted && result['success'] == true) {
+        setState(() {
+          _isLoadingStages = false;
+          final data = result['data'];
+          if (data is List) {
+            _stages = data
+                .map((s) => ProjectStageModel.fromJson(s as Map<String, dynamic>))
+                .toList();
+          } else {
+            _stages = [];
+          }
+          
+          // Обновление информации о пагинации
+          if (result['pagination'] != null) {
+            final pagination = result['pagination'] as Map<String, dynamic>;
+            _stagesCurrentPage = pagination['currentPage'] as int? ?? 1;
+            _stagesTotalPages = pagination['totalPages'] as int? ?? 1;
+            _stagesTotalCount = pagination['count'] as int? ?? 0;
+          } else {
+            // Значения по умолчанию, если пагинация не предоставлена
+            _stagesCurrentPage = 1;
+            _stagesTotalPages = 1;
+            _stagesTotalCount = _stages.length;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingStages = false;
+          _stages = [];
+          _stagesCurrentPage = 1;
+          _stagesTotalPages = 1;
+          _stagesTotalCount = 0;
+        });
+      }
     }
   }
 
   /// Загрузка листов
-  Future<void> _loadSheets() async {
-    final result = await ApiService.getProjectSheets(widget.project.id);
-    if (mounted && result['success'] == true) {
-      setState(() {
-        _sheets = (result['data'] as List)
-            .map((s) => ProjectSheetModel.fromJson(s as Map<String, dynamic>))
-            .toList();
-      });
+  Future<void> _loadSheets({int? page, bool showLoading = true}) async {
+    try {
+      final currentPage = page ?? _sheetsCurrentPage;
+      
+      if (showLoading && mounted) {
+        setState(() {
+          _isLoadingSheets = true;
+        });
+      }
+      
+      final result = await ApiService.getProjectSheets(
+        widget.project.id,
+        page: currentPage,
+        pageSize: 5,
+      );
+      if (mounted && result['success'] == true) {
+        setState(() {
+          _isLoadingSheets = false;
+          final data = result['data'];
+          if (data is List) {
+            _sheets = data
+                .map((s) => ProjectSheetModel.fromJson(s as Map<String, dynamic>))
+                .toList();
+          } else {
+            _sheets = [];
+          }
+          
+          // Обновление информации о пагинации
+          if (result['pagination'] != null) {
+            final pagination = result['pagination'] as Map<String, dynamic>;
+            _sheetsCurrentPage = pagination['currentPage'] as int? ?? 1;
+            _sheetsTotalPages = pagination['totalPages'] as int? ?? 1;
+            _sheetsTotalCount = pagination['count'] as int? ?? 0;
+          } else {
+            // Значения по умолчанию, если пагинация не предоставлена
+            _sheetsCurrentPage = 1;
+            _sheetsTotalPages = 1;
+            _sheetsTotalCount = _sheets.length;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingSheets = false;
+          _sheets = [];
+          _sheetsCurrentPage = 1;
+          _sheetsTotalPages = 1;
+          _sheetsTotalCount = 0;
+        });
+      }
     }
   }
 
   /// Обновление данных
   void _refreshData() {
+    _stagesCurrentPage = 1;
+    _sheetsCurrentPage = 1;
     _loadData();
+  }
+
+  /// Переход на предыдущую страницу этапов
+  void _loadStagesPreviousPage() {
+    if (_stagesCurrentPage > 1 && !_isLoadingStages) {
+      _loadStages(page: _stagesCurrentPage - 1, showLoading: true);
+    }
+  }
+
+  /// Переход на следующую страницу этапов
+  void _loadStagesNextPage() {
+    if (_stagesCurrentPage < _stagesTotalPages && !_isLoadingStages) {
+      _loadStages(page: _stagesCurrentPage + 1, showLoading: true);
+    }
+  }
+
+  /// Переход на предыдущую страницу листов
+  void _loadSheetsPreviousPage() {
+    if (_sheetsCurrentPage > 1 && !_isLoadingSheets) {
+      _loadSheets(page: _sheetsCurrentPage - 1, showLoading: true);
+    }
+  }
+
+  /// Переход на следующую страницу листов
+  void _loadSheetsNextPage() {
+    if (_sheetsCurrentPage < _sheetsTotalPages && !_isLoadingSheets) {
+      _loadSheets(page: _sheetsCurrentPage + 1, showLoading: true);
+    }
   }
 
   @override
@@ -382,26 +510,42 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           const Divider(height: 1),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 400),
-            child: _stages.isEmpty
+            child: _isLoadingStages
                 ? const Center(
                     child: Padding(
                       padding: EdgeInsets.all(32.0),
-                      child: Text(
-                        'Нет этапов',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
+                      child: CircularProgressIndicator(),
                     ),
                   )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.all(8),
-                    itemCount: _stages.length,
-                    itemBuilder: (context, index) {
-                      return _buildStageCard(_stages[index], isMobile);
-                    },
-                  ),
+                : _stages.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Text(
+                            'Нет этапов',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(8),
+                        itemCount: _stages.length,
+                        itemBuilder: (context, index) {
+                          return _buildStageCard(_stages[index], isMobile);
+                        },
+                      ),
+          ),
+          _buildPaginationControls(
+            currentPage: _stagesCurrentPage,
+            totalPages: _stagesTotalPages,
+            totalCount: _stagesTotalCount,
+            onPrevious: _loadStagesPreviousPage,
+            onNext: _loadStagesNextPage,
+            hasPrevious: _stagesCurrentPage > 1,
+            hasNext: _stagesCurrentPage < _stagesTotalPages,
           ),
         ],
       ),
@@ -452,26 +596,42 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           const Divider(height: 1),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 400),
-            child: _sheets.isEmpty
+            child: _isLoadingSheets
                 ? const Center(
                     child: Padding(
                       padding: EdgeInsets.all(32.0),
-                      child: Text(
-                        'Нет листов',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
+                      child: CircularProgressIndicator(),
                     ),
                   )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.all(8),
-                    itemCount: _sheets.length,
-                    itemBuilder: (context, index) {
-                      return _buildSheetCard(_sheets[index], isMobile);
-                    },
-                  ),
+                : _sheets.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Text(
+                            'Нет листов',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(8),
+                        itemCount: _sheets.length,
+                        itemBuilder: (context, index) {
+                          return _buildSheetCard(_sheets[index], isMobile);
+                        },
+                      ),
+          ),
+          _buildPaginationControls(
+            currentPage: _sheetsCurrentPage,
+            totalPages: _sheetsTotalPages,
+            totalCount: _sheetsTotalCount,
+            onPrevious: _loadSheetsPreviousPage,
+            onNext: _loadSheetsNextPage,
+            hasPrevious: _sheetsCurrentPage > 1,
+            hasNext: _sheetsCurrentPage < _sheetsTotalPages,
           ),
         ],
       ),
@@ -992,5 +1152,82 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     } catch (e) {
       return AppColors.textSecondary;
     }
+  }
+
+  /// Виджет пагинации
+  Widget _buildPaginationControls({
+    required int currentPage,
+    required int totalPages,
+    required int totalCount,
+    required VoidCallback onPrevious,
+    required VoidCallback onNext,
+    required bool hasPrevious,
+    required bool hasNext,
+  }) {
+    if (totalPages <= 1) {
+      return const SizedBox.shrink();
+    }
+
+    final startItem = ((currentPage - 1) * 5) + 1;
+    final endItem = (currentPage * 5).clamp(0, totalCount);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.3),
+        border: Border(
+          top: BorderSide(
+            color: AppColors.borderColor.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Показано $startItem-$endItem из $totalCount',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: hasPrevious ? onPrevious : null,
+                icon: const Icon(Icons.chevron_left),
+                iconSize: 20,
+                color: hasPrevious
+                    ? AppColors.accentBlue
+                    : AppColors.textSecondary.withOpacity(0.3),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$currentPage / $totalPages',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: hasNext ? onNext : null,
+                icon: const Icon(Icons.chevron_right),
+                iconSize: 20,
+                color: hasNext
+                    ? AppColors.accentBlue
+                    : AppColors.textSecondary.withOpacity(0.3),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

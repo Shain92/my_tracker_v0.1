@@ -179,11 +179,18 @@ class ProjectSheetViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSheetSerializer
     
     def get_queryset(self):
-        """Фильтрация по проекту"""
+        """Фильтрация по проекту и сортировка"""
         queryset = super().get_queryset()
         project_id = self.request.query_params.get('project_id')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
+        
+        # Сортировка: 1. Выполненные внизу, 2. По отделам, 3. По алфавиту
+        queryset = queryset.order_by(
+            'is_completed',  # False сначала, True потом (выполненные внизу)
+            'responsible_department__name',  # По отделам
+            'name'  # По алфавиту
+        )
         return queryset
     
     def perform_create(self, serializer):

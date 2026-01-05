@@ -749,7 +749,16 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'data': data};
+        
+        // Обработка ответа с пагинацией
+        if (data is Map<String, dynamic> && data.containsKey('results')) {
+          final results = data['results'] as List? ?? [];
+          return {'success': true, 'data': results};
+        } else if (data is List) {
+          return {'success': true, 'data': data};
+        } else {
+          return {'success': true, 'data': [data]};
+        }
       } else {
         final error = jsonDecode(response.body);
         return {'success': false, 'error': error['error'] ?? 'Ошибка получения списка проектов'};
@@ -1085,16 +1094,121 @@ class ApiService {
     }
   }
 
-  /// Получение этапов проекта
-  static Future<Map<String, dynamic>> getProjectStages(int projectId) async {
+  /// Создание статуса
+  static Future<Map<String, dynamic>> createStatus(
+    String name,
+    String statusType, {
+    String? color,
+  }) async {
+    try {
+      final token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final requestBody = {
+        'name': name,
+        'status_type': statusType,
+        'color': color ?? '#000000',
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/projects/statuses/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data};
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? error['detail'] ?? 'Ошибка создания статуса'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
+  /// Обновление статуса
+  static Future<Map<String, dynamic>> updateStatus(int id, Map<String, dynamic> data) async {
+    try {
+      final token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final response = await http.patch(
+        Uri.parse('$baseUrl/projects/statuses/$id/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        return {'success': true, 'data': responseData};
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? error['detail'] ?? 'Ошибка обновления статуса'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
+  /// Удаление статуса
+  static Future<Map<String, dynamic>> deleteStatus(int id) async {
+    try {
+      final token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/projects/statuses/$id/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 204) {
+        return {'success': true};
+      } else {
+        final error = response.body.isNotEmpty ? jsonDecode(response.body) : {'error': 'Ошибка удаления статуса'};
+        return {'success': false, 'error': error['error'] ?? error['detail'] ?? 'Ошибка удаления статуса'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
+  /// Получение этапов проекта с пагинацией
+  static Future<Map<String, dynamic>> getProjectStages(
+    int projectId, {
+    int page = 1,
+    int pageSize = 5,
+  }) async {
     try {
       var token = await getAccessToken();
       if (token == null || token.isEmpty) {
         return {'success': false, 'error': 'Не авторизован'};
       }
 
+      final queryParams = {
+        'project_id': projectId.toString(),
+        'page': page.toString(),
+        'page_size': pageSize.toString(),
+      };
+
       final uri = Uri.parse('$baseUrl/projects/project-stages/').replace(
-        queryParameters: {'project_id': projectId.toString()},
+        queryParameters: queryParams,
       );
 
       var response = await http.get(
@@ -1123,7 +1237,53 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'data': data};
+        
+        // Обработка ответа с пагинацией
+        if (data is Map<String, dynamic> && data.containsKey('results')) {
+          final count = data['count'] as int? ?? 0;
+          final results = data['results'] as List? ?? [];
+          final next = data['next'] as String?;
+          final previous = data['previous'] as String?;
+          final totalPages = count > 0 ? (count / pageSize).ceil() : 1;
+          
+          return {
+            'success': true,
+            'data': results,
+            'pagination': {
+              'count': count,
+              'currentPage': page,
+              'totalPages': totalPages,
+              'hasNext': next != null,
+              'hasPrevious': previous != null,
+            },
+          };
+        } else if (data is List) {
+          // Обратная совместимость: если ответ - список без пагинации
+          return {
+            'success': true,
+            'data': data,
+            'pagination': {
+              'count': data.length,
+              'currentPage': 1,
+              'totalPages': 1,
+              'hasNext': false,
+              'hasPrevious': false,
+            },
+          };
+        } else {
+          // Обратная совместимость: если ответ - объект
+          return {
+            'success': true,
+            'data': [data],
+            'pagination': {
+              'count': 1,
+              'currentPage': 1,
+              'totalPages': 1,
+              'hasNext': false,
+              'hasPrevious': false,
+            },
+          };
+        }
       } else {
         final error = jsonDecode(response.body);
         return {'success': false, 'error': error['error'] ?? 'Ошибка получения этапов'};
@@ -1505,16 +1665,26 @@ class ApiService {
     }
   }
 
-  /// Получение проектных листов
-  static Future<Map<String, dynamic>> getProjectSheets(int projectId) async {
+  /// Получение проектных листов с пагинацией
+  static Future<Map<String, dynamic>> getProjectSheets(
+    int projectId, {
+    int page = 1,
+    int pageSize = 5,
+  }) async {
     try {
       var token = await getAccessToken();
       if (token == null || token.isEmpty) {
         return {'success': false, 'error': 'Не авторизован'};
       }
 
+      final queryParams = {
+        'project_id': projectId.toString(),
+        'page': page.toString(),
+        'page_size': pageSize.toString(),
+      };
+
       final uri = Uri.parse('$baseUrl/projects/project-sheets/').replace(
-        queryParameters: {'project_id': projectId.toString()},
+        queryParameters: queryParams,
       );
 
       var response = await http.get(
@@ -1543,7 +1713,53 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'data': data};
+        
+        // Обработка ответа с пагинацией
+        if (data is Map<String, dynamic> && data.containsKey('results')) {
+          final count = data['count'] as int? ?? 0;
+          final results = data['results'] as List? ?? [];
+          final next = data['next'] as String?;
+          final previous = data['previous'] as String?;
+          final totalPages = count > 0 ? (count / pageSize).ceil() : 1;
+          
+          return {
+            'success': true,
+            'data': results,
+            'pagination': {
+              'count': count,
+              'currentPage': page,
+              'totalPages': totalPages,
+              'hasNext': next != null,
+              'hasPrevious': previous != null,
+            },
+          };
+        } else if (data is List) {
+          // Обратная совместимость: если ответ - список без пагинации
+          return {
+            'success': true,
+            'data': data,
+            'pagination': {
+              'count': data.length,
+              'currentPage': 1,
+              'totalPages': 1,
+              'hasNext': false,
+              'hasPrevious': false,
+            },
+          };
+        } else {
+          // Обратная совместимость: если ответ - объект
+          return {
+            'success': true,
+            'data': [data],
+            'pagination': {
+              'count': 1,
+              'currentPage': 1,
+              'totalPages': 1,
+              'hasNext': false,
+              'hasPrevious': false,
+            },
+          };
+        }
       } else {
         final error = jsonDecode(response.body);
         return {'success': false, 'error': error['error'] ?? 'Ошибка получения листов'};

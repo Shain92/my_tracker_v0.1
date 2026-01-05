@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import 'users_list_screen.dart';
 import 'departments_list_screen.dart';
+import 'statuses_list_screen.dart';
 
 /// Страница настроек
 class SettingsScreen extends StatefulWidget {
@@ -134,6 +135,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Системные настройки',
                     icon: Icons.tune,
                     children: [
+                      _SettingsCard(
+                        title: 'Статусы',
+                        description: 'Просмотр и управление статусами проектных листов и этапов',
+                        icon: Icons.label,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const StatusesListScreen(),
+                            ),
+                          );
+                        },
+                      ),
                       _SettingsCard(
                         title: 'Конфигурация базы данных',
                         description: 'Настройки подключения к базе данных',

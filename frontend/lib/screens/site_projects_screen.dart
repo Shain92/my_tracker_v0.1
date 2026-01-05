@@ -44,10 +44,15 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
       setState(() {
         _isLoading = false;
         if (result['success'] == true) {
-          final data = result['data'] as List;
-          _projects = data
-              .map((json) => ProjectModel.fromJson(json as Map<String, dynamic>))
-              .toList();
+          final data = result['data'];
+          if (data is List) {
+            _projects = data
+                .map((json) => ProjectModel.fromJson(json as Map<String, dynamic>))
+                .toList();
+          } else {
+            _projects = [];
+            _errorMessage = 'Неверный формат данных от сервера';
+          }
         } else {
           _errorMessage = result['error'] ?? 'Ошибка загрузки проектов';
         }
