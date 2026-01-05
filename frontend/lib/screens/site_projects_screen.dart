@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/app_models.dart';
 import '../widgets/project_form_dialog.dart';
+import '../widgets/progress_bars.dart' as progress_bars;
 import 'project_detail_screen.dart';
 
 /// Экран проектов строительного участка
@@ -295,7 +296,7 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
 }
 
 /// Карточка проекта
-class _ProjectCard extends StatelessWidget {
+class _ProjectCard extends StatefulWidget {
   final ProjectModel project;
   final ConstructionSiteModel constructionSite;
   final VoidCallback? onRefresh;
@@ -309,6 +310,179 @@ class _ProjectCard extends StatelessWidget {
   });
 
   @override
+  State<_ProjectCard> createState() => _ProjectCardState();
+}
+
+class _ProjectCardState extends State<_ProjectCard> {
+  bool _isLoadingDepartmentStats = false;
+  List<progress_bars.DepartmentCompletionStats> _departmentStats = [];
+  ProjectStageModel? _lastStage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDepartmentStats();
+    _loadLastStage();
+  }
+
+  /// Загрузка последнего этапа проекта
+  Future<void> _loadLastStage() async {
+    try {
+      final result = await ApiService.getProjectStages(
+        widget.project.id,
+        page: 1,
+        pageSize: 1,
+      );
+
+      if (mounted) {
+        setState(() {
+          if (result['success'] == true) {
+            final data = result['data'] as List?;
+            if (data != null && data.isNotEmpty) {
+              _lastStage = ProjectStageModel.fromJson(data[0] as Map<String, dynamic>);
+            } else {
+              _lastStage = null;
+            }
+          } else {
+            _lastStage = null;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _lastStage = null;
+        });
+      }
+    }
+  }
+
+  /// Загрузка статистики по отделам
+  Future<void> _loadDepartmentStats() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingDepartmentStats = true;
+      });
+    }
+
+    try {
+      List<ProjectSheetModel> allSheets = [];
+      int currentPage = 1;
+      bool hasMore = true;
+      
+      while (hasMore && mounted) {
+        final result = await ApiService.getProjectSheets(
+          widget.project.id,
+          page: currentPage,
+          pageSize: 100,
+        );
+
+        if (result['success'] == true) {
+          final data = result['data'];
+          
+          if (data is List) {
+            final pageSheets = data
+                .map((s) => ProjectSheetModel.fromJson(s as Map<String, dynamic>))
+                .toList();
+            allSheets.addAll(pageSheets);
+          }
+          
+          final pagination = result['pagination'] as Map<String, dynamic>?;
+          if (pagination != null) {
+            hasMore = pagination['hasNext'] == true;
+            currentPage++;
+          } else {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (mounted) {
+        final Map<int, progress_bars.DepartmentCompletionStats> statsMap = {};
+        int totalIncompleteSheets = 0;
+        
+        for (final sheet in allSheets) {
+          if (sheet.responsibleDepartment != null) {
+            final deptId = sheet.responsibleDepartment!.id;
+            
+            if (!statsMap.containsKey(deptId)) {
+              statsMap[deptId] = progress_bars.DepartmentCompletionStats(
+                departmentId: deptId,
+                departmentName: sheet.responsibleDepartment!.name,
+                departmentColor: sheet.responsibleDepartment!.color,
+                totalSheets: 0,
+                completedSheets: 0,
+                incompleteSheets: 0,
+                completionPercentage: 0.0,
+                incompletePercentage: 0.0,
+              );
+            }
+            
+            final stats = statsMap[deptId]!;
+            final isCompleted = sheet.isCompleted;
+            final isIncomplete = !isCompleted;
+            
+            statsMap[deptId] = progress_bars.DepartmentCompletionStats(
+              departmentId: stats.departmentId,
+              departmentName: stats.departmentName,
+              departmentColor: stats.departmentColor,
+              totalSheets: stats.totalSheets + 1,
+              completedSheets: stats.completedSheets + (isCompleted ? 1 : 0),
+              incompleteSheets: stats.incompleteSheets + (isIncomplete ? 1 : 0),
+              completionPercentage: 0.0,
+              incompletePercentage: 0.0,
+            );
+            
+            if (isIncomplete) {
+              totalIncompleteSheets++;
+            }
+          }
+        }
+
+        final List<progress_bars.DepartmentCompletionStats> statsList = [];
+        for (final stats in statsMap.values) {
+          final completionPercentage = stats.totalSheets > 0
+              ? (stats.completedSheets / stats.totalSheets) * 100
+              : 0.0;
+          
+          final incompletePercentage = totalIncompleteSheets > 0
+              ? (stats.incompleteSheets / totalIncompleteSheets) * 100
+              : 0.0;
+          
+          statsList.add(progress_bars.DepartmentCompletionStats(
+            departmentId: stats.departmentId,
+            departmentName: stats.departmentName,
+            departmentColor: stats.departmentColor,
+            totalSheets: stats.totalSheets,
+            completedSheets: stats.completedSheets,
+            incompleteSheets: stats.incompleteSheets,
+            completionPercentage: completionPercentage,
+            incompletePercentage: incompletePercentage,
+          ));
+        }
+
+        statsList.sort((a, b) => b.incompleteSheets.compareTo(a.incompleteSheets));
+
+        if (mounted) {
+          setState(() {
+            _departmentStats = statsList;
+            _isLoadingDepartmentStats = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _departmentStats = [];
+          _isLoadingDepartmentStats = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
@@ -318,19 +492,22 @@ class _ProjectCard extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => ProjectDetailScreen(
-                project: project,
+                project: widget.project,
               ),
             ),
           );
           
           // Обновляем проект после возврата из детального экрана
-          if (onProjectUpdated != null) {
+          if (widget.onProjectUpdated != null) {
             try {
-              final projectResult = await ApiService.getProject(project.id);
+              final projectResult = await ApiService.getProject(widget.project.id);
               if (projectResult['success'] == true) {
                 final projectData = projectResult['data'] as Map<String, dynamic>;
                 final updatedProject = ProjectModel.fromJson(projectData);
-                onProjectUpdated!(updatedProject);
+                widget.onProjectUpdated!(updatedProject);
+                // Перезагружаем статистику по отделам и последний этап
+                _loadDepartmentStats();
+                _loadLastStage();
               }
             } catch (e) {
               // Игнорируем ошибки при обновлении
@@ -377,18 +554,18 @@ class _ProjectCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    project.name,
+                    widget.project.name,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  if (project.description != null &&
-                      project.description!.isNotEmpty) ...[
+                  if (widget.project.description != null &&
+                      widget.project.description!.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      project.description!,
+                      widget.project.description!,
                       style: const TextStyle(
                         fontSize: 14,
                         color: AppColors.textSecondary,
@@ -412,7 +589,7 @@ class _ProjectCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'Код: ${project.code}',
+                            'Код: ${widget.project.code}',
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
@@ -430,7 +607,7 @@ class _ProjectCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'Шифр: ${project.cipher}',
+                            'Шифр: ${widget.project.cipher}',
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
@@ -438,27 +615,22 @@ class _ProjectCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      if (project.completionPercentage != null) ...[
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.check_circle,
-                              size: 16,
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${project.completionPercentage!.toStringAsFixed(1)}%',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Общая шкала выполнения
+                  progress_bars.OverallProgressBar(
+                    completionPercentage: widget.project.completionPercentage,
+                    compact: true,
+                    status: _lastStage?.status,
+                  ),
+                  const SizedBox(height: 8),
+                  // Шкала по отделам
+                  progress_bars.DepartmentProgressBar(
+                    departmentStats: _departmentStats,
+                    isLoading: _isLoadingDepartmentStats,
+                    compact: true,
+                    showLegend: false,
                   ),
                 ],
               ),
@@ -482,13 +654,13 @@ class _ProjectCard extends StatelessWidget {
     final result = await showDialog(
       context: context,
       builder: (context) => ProjectFormDialog(
-        project: project,
-        constructionSite: constructionSite,
-        onRefresh: onRefresh,
+        project: widget.project,
+        constructionSite: widget.constructionSite,
+        onRefresh: widget.onRefresh,
       ),
     );
-    if (result != null && result['success'] == true && onRefresh != null) {
-      onRefresh!();
+    if (result != null && result['success'] == true && widget.onRefresh != null) {
+      widget.onRefresh!();
     }
   }
 }

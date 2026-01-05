@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/app_models.dart';
 import '../widgets/construction_site_form_dialog.dart';
+import '../widgets/progress_bars.dart' as progress_bars;
 import 'site_projects_screen.dart';
 
 /// Экран изыскательских данных (ИД) - список строительных участков
@@ -262,7 +263,7 @@ class _ProjectIdScreenState extends State<ProjectIdScreen> {
 }
 
 /// Карточка строительного участка
-class _ConstructionSiteCard extends StatelessWidget {
+class _ConstructionSiteCard extends StatefulWidget {
   final ConstructionSiteModel constructionSite;
   final VoidCallback? onRefresh;
   final Function(ConstructionSiteModel)? onConstructionSiteUpdated;
@@ -274,6 +275,179 @@ class _ConstructionSiteCard extends StatelessWidget {
   });
 
   @override
+  State<_ConstructionSiteCard> createState() => _ConstructionSiteCardState();
+}
+
+class _ConstructionSiteCardState extends State<_ConstructionSiteCard> {
+  bool _isLoadingDepartmentStats = false;
+  List<progress_bars.DepartmentCompletionStats> _departmentStats = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDepartmentStats();
+  }
+
+  /// Загрузка статистики по отделам для всех проектов участка
+  Future<void> _loadDepartmentStats() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingDepartmentStats = true;
+      });
+    }
+
+    try {
+      // Получаем все проекты участка
+      final projectsResult = await ApiService.getProjects(
+        constructionSiteId: widget.constructionSite.id,
+      );
+
+      if (projectsResult['success'] != true) {
+        if (mounted) {
+          setState(() {
+            _departmentStats = [];
+            _isLoadingDepartmentStats = false;
+          });
+        }
+        return;
+      }
+
+      final projectsData = projectsResult['data'];
+      if (projectsData is! List) {
+        if (mounted) {
+          setState(() {
+            _departmentStats = [];
+            _isLoadingDepartmentStats = false;
+          });
+        }
+        return;
+      }
+
+      final projects = projectsData
+          .map((json) => ProjectModel.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      // Загружаем все листы всех проектов
+      List<ProjectSheetModel> allSheets = [];
+      
+      for (final project in projects) {
+        int currentPage = 1;
+        bool hasMore = true;
+        
+        while (hasMore && mounted) {
+          final result = await ApiService.getProjectSheets(
+            project.id,
+            page: currentPage,
+            pageSize: 100,
+          );
+
+          if (result['success'] == true) {
+            final data = result['data'];
+            
+            if (data is List) {
+              final pageSheets = data
+                  .map((s) => ProjectSheetModel.fromJson(s as Map<String, dynamic>))
+                  .toList();
+              allSheets.addAll(pageSheets);
+            }
+            
+            final pagination = result['pagination'] as Map<String, dynamic>?;
+            if (pagination != null) {
+              hasMore = pagination['hasNext'] == true;
+              currentPage++;
+            } else {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+      }
+
+      if (mounted) {
+        final Map<int, progress_bars.DepartmentCompletionStats> statsMap = {};
+        int totalIncompleteSheets = 0;
+        
+        for (final sheet in allSheets) {
+          if (sheet.responsibleDepartment != null) {
+            final deptId = sheet.responsibleDepartment!.id;
+            
+            if (!statsMap.containsKey(deptId)) {
+              statsMap[deptId] = progress_bars.DepartmentCompletionStats(
+                departmentId: deptId,
+                departmentName: sheet.responsibleDepartment!.name,
+                departmentColor: sheet.responsibleDepartment!.color,
+                totalSheets: 0,
+                completedSheets: 0,
+                incompleteSheets: 0,
+                completionPercentage: 0.0,
+                incompletePercentage: 0.0,
+              );
+            }
+            
+            final stats = statsMap[deptId]!;
+            final isCompleted = sheet.isCompleted;
+            final isIncomplete = !isCompleted;
+            
+            statsMap[deptId] = progress_bars.DepartmentCompletionStats(
+              departmentId: stats.departmentId,
+              departmentName: stats.departmentName,
+              departmentColor: stats.departmentColor,
+              totalSheets: stats.totalSheets + 1,
+              completedSheets: stats.completedSheets + (isCompleted ? 1 : 0),
+              incompleteSheets: stats.incompleteSheets + (isIncomplete ? 1 : 0),
+              completionPercentage: 0.0,
+              incompletePercentage: 0.0,
+            );
+            
+            if (isIncomplete) {
+              totalIncompleteSheets++;
+            }
+          }
+        }
+
+        final List<progress_bars.DepartmentCompletionStats> statsList = [];
+        for (final stats in statsMap.values) {
+          final completionPercentage = stats.totalSheets > 0
+              ? (stats.completedSheets / stats.totalSheets) * 100
+              : 0.0;
+          
+          final incompletePercentage = totalIncompleteSheets > 0
+              ? (stats.incompleteSheets / totalIncompleteSheets) * 100
+              : 0.0;
+          
+          statsList.add(progress_bars.DepartmentCompletionStats(
+            departmentId: stats.departmentId,
+            departmentName: stats.departmentName,
+            departmentColor: stats.departmentColor,
+            totalSheets: stats.totalSheets,
+            completedSheets: stats.completedSheets,
+            incompleteSheets: stats.incompleteSheets,
+            completionPercentage: completionPercentage,
+            incompletePercentage: incompletePercentage,
+          ));
+        }
+
+        statsList.sort((a, b) => b.incompleteSheets.compareTo(a.incompleteSheets));
+
+        if (mounted) {
+          setState(() {
+            _departmentStats = statsList;
+            _isLoadingDepartmentStats = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _departmentStats = [];
+          _isLoadingDepartmentStats = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
@@ -283,19 +457,21 @@ class _ConstructionSiteCard extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => SiteProjectsScreen(
-                constructionSite: constructionSite,
+                constructionSite: widget.constructionSite,
               ),
             ),
           );
           
           // Обновляем участок после возврата из экрана проектов
-          if (onConstructionSiteUpdated != null) {
+          if (widget.onConstructionSiteUpdated != null) {
             try {
-              final siteResult = await ApiService.getConstructionSite(constructionSite.id);
+              final siteResult = await ApiService.getConstructionSite(widget.constructionSite.id);
               if (siteResult['success'] == true) {
                 final siteData = siteResult['data'] as Map<String, dynamic>;
                 final updatedSite = ConstructionSiteModel.fromJson(siteData);
-                onConstructionSiteUpdated!(updatedSite);
+                widget.onConstructionSiteUpdated!(updatedSite);
+                // Перезагружаем статистику по отделам
+                _loadDepartmentStats();
               }
             } catch (e) {
               // Игнорируем ошибки при обновлении
@@ -342,18 +518,18 @@ class _ConstructionSiteCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        constructionSite.name,
+                        widget.constructionSite.name,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      if (constructionSite.description != null &&
-                          constructionSite.description!.isNotEmpty) ...[
+                      if (widget.constructionSite.description != null &&
+                          widget.constructionSite.description!.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
-                          constructionSite.description!,
+                          widget.constructionSite.description!,
                           style: const TextStyle(
                             fontSize: 14,
                             color: AppColors.textSecondary,
@@ -367,7 +543,7 @@ class _ConstructionSiteCard extends StatelessWidget {
                         spacing: 16,
                         runSpacing: 8,
                         children: [
-                          if (constructionSite.manager != null) ...[
+                          if (widget.constructionSite.manager != null) ...[
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -378,27 +554,7 @@ class _ConstructionSiteCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  constructionSite.manager!.username,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          if (constructionSite.completionPercentage != null) ...[
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.check_circle,
-                                  size: 16,
-                                  color: AppColors.textSecondary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${constructionSite.completionPercentage!.toStringAsFixed(1)}%',
+                                  widget.constructionSite.manager!.username,
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textSecondary,
@@ -408,6 +564,20 @@ class _ConstructionSiteCard extends StatelessWidget {
                             ),
                           ],
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Общая шкала выполнения
+                      progress_bars.OverallProgressBar(
+                        completionPercentage: widget.constructionSite.completionPercentage,
+                        compact: true,
+                      ),
+                      const SizedBox(height: 8),
+                      // Шкала по отделам
+                      progress_bars.DepartmentProgressBar(
+                        departmentStats: _departmentStats,
+                        isLoading: _isLoadingDepartmentStats,
+                        compact: true,
+                        showLegend: false,
                       ),
                     ],
                   ),
@@ -431,12 +601,12 @@ class _ConstructionSiteCard extends StatelessWidget {
     final result = await showDialog(
       context: context,
       builder: (context) => ConstructionSiteFormDialog(
-        constructionSite: constructionSite,
-        onRefresh: onRefresh,
+        constructionSite: widget.constructionSite,
+        onRefresh: widget.onRefresh,
       ),
     );
-    if (result != null && result['success'] == true && onRefresh != null) {
-      onRefresh!();
+    if (result != null && result['success'] == true && widget.onRefresh != null) {
+      widget.onRefresh!();
     }
   }
 }
