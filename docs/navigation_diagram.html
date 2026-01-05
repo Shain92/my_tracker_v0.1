@@ -199,7 +199,11 @@
                 zoomView: true,
                 dragView: true,
                 dragNodes: true,
-                selectConnectedEdges: false
+                selectConnectedEdges: false,
+                multiselect: false
+            },
+            manipulation: {
+                enabled: false
             }
         };
 
@@ -272,7 +276,7 @@
             }, 2500);
         }
 
-        // Автоматическое масштабирование при загрузке
+        // Автоматическое масштабирование при загрузке и отключение иерархического layout
         network.on('stabilizationEnd', function() {
             network.fit({
                 animation: {
@@ -280,6 +284,26 @@
                     easingFunction: 'easeInOutQuad'
                 }
             });
+            
+            // Отключаем иерархический layout после загрузки для свободного перемещения
+            setTimeout(() => {
+                const newOptions = {
+                    layout: {
+                        hierarchical: {
+                            enabled: false
+                        }
+                    }
+                };
+                network.setOptions(newOptions);
+            }, 600);
+        });
+
+        // Сохраняем позиции узлов при перетаскивании
+        network.on('dragEnd', function(params) {
+            if (params.nodes.length > 0) {
+                // Позиции уже сохранены автоматически в vis.js
+                // Можно добавить сохранение в localStorage если нужно
+            }
         });
     </script>
 </body>

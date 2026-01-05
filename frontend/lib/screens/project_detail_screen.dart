@@ -1079,8 +1079,8 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
             ),
           ),
           const Divider(height: 1),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 400),
+          SizedBox(
+            height: 510, // Фиксированная высота для 5 карточек (600px - 15%)
             child: _isLoading
                 ? const Center(
                     child: Padding(
@@ -1101,7 +1101,6 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
                         ),
                       )
                     : ListView.builder(
-                        shrinkWrap: true,
                         padding: const EdgeInsets.all(8),
                         itemCount: _stages.length,
                         itemBuilder: (context, index) {
@@ -1417,8 +1416,8 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
             ),
           ),
           const Divider(height: 1),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 400),
+          SizedBox(
+            height: 510, // Фиксированная высота для 5 карточек (600px - 15%)
             child: _isLoading
                 ? const Center(
                     child: Padding(
@@ -1439,7 +1438,6 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
                         ),
                       )
                     : ListView.builder(
-                        shrinkWrap: true,
                         padding: const EdgeInsets.all(8),
                         itemCount: _sheets.length,
                         itemBuilder: (context, index) {
