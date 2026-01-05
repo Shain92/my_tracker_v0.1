@@ -490,9 +490,20 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  if (stage.status != null) ...[
+              // Дата и время
+              Text(
+                '${stage.datetime.day.toString().padLeft(2, '0')}.${stage.datetime.month.toString().padLeft(2, '0')}.${stage.datetime.year} ${stage.datetime.hour.toString().padLeft(2, '0')}:${stage.datetime.minute.toString().padLeft(2, '0')}',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              // Статус целиком
+              if (stage.status != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
                     Container(
                       width: 12,
                       height: 12,
@@ -502,26 +513,19 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: Text(
-                      '${stage.datetime.day.toString().padLeft(2, '0')}.${stage.datetime.month.toString().padLeft(2, '0')}.${stage.datetime.year} ${stage.datetime.hour.toString().padLeft(2, '0')}:${stage.datetime.minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        stage.status!.name,
+                        style: TextStyle(
+                          color: _parseColor(stage.status!.color),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, size: 18),
-                    color: AppColors.accentPink,
-                    onPressed: () => _deleteStage(stage),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               if (stage.description != null && stage.description!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -534,24 +538,60 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-              if (stage.author != null) ...[
+              // Ответственные пользователи
+              if (stage.responsibleUsers != null && stage.responsibleUsers!.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.person,
-                      size: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      stage.author!.username,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: stage.responsibleUsers!.map((user) {
+                    final departmentColor = user.department?.color != null
+                        ? _parseColor(user.department!.color)
+                        : AppColors.textSecondary;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.person,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          user.username,
+                          style: TextStyle(
+                            color: departmentColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ],
+              if (stage.fileUrl != null && stage.fileUrl!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () => _downloadStageFile(stage),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.download,
+                        size: 16,
+                        color: AppColors.accentBlue,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Скачать файл',
+                        style: TextStyle(
+                          color: AppColors.accentBlue,
+                          fontSize: 12,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -570,6 +610,15 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       color: AppColors.cardBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(
+          color: sheet.isCompleted
+              ? AppColors.accentGreen
+              : AppColors.borderColor.withOpacity(0.3),
+          width: sheet.isCompleted ? 2 : 1,
+        ),
+      ),
       child: InkWell(
         onTap: () => _showSheetDialog(sheet),
         child: Padding(
@@ -579,13 +628,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             children: [
               Row(
                 children: [
-                  Checkbox(
-                    value: sheet.isCompleted,
-                    onChanged: canToggleCompleted
-                        ? (value) => _toggleSheetCompleted(sheet, value ?? false)
-                        : null,
-                    activeColor: AppColors.accentGreen,
-                  ),
+                  if (!sheet.isCompleted)
+                    Checkbox(
+                      value: sheet.isCompleted,
+                      onChanged: canToggleCompleted
+                          ? (value) => _toggleSheetCompleted(sheet, value ?? false)
+                          : null,
+                      activeColor: AppColors.accentGreen,
+                    ),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,27 +679,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, size: 18),
-                    color: AppColors.accentPink,
-                    onPressed: () => _deleteSheet(sheet),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
                 ],
               ),
-              if (sheet.description != null && sheet.description!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  sheet.description!,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
               if (sheet.responsibleDepartment != null) ...[
                 const SizedBox(height: 8),
                 Row(
@@ -671,6 +702,18 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       ),
                     ),
                   ],
+                ),
+              ],
+              if (sheet.description != null && sheet.description!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  sheet.description!,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
               if (sheet.fileUrl != null && sheet.fileUrl!.isNotEmpty) ...[
@@ -911,6 +954,69 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           _downloadFileFromUrl(sheet.fileUrl!, filename);
         } else {
           // Если URL нет, используем blob для веб
+          _downloadFileBytes(bytes, filename);
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Ошибка скачивания файла'),
+            backgroundColor: AppColors.accentPink,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка: ${e.toString()}'),
+          backgroundColor: AppColors.accentPink,
+        ),
+      );
+    }
+  }
+
+  /// Скачивание файла этапа проекта
+  Future<void> _downloadStageFile(ProjectStageModel stage) async {
+    if (stage.fileUrl == null || stage.fileUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Файл не прикреплен'),
+          backgroundColor: AppColors.accentPink,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final result = await ApiService.downloadProjectStageFile(stage.id);
+      if (result['success'] == true) {
+        final bytes = result['data'] as List<int>;
+        final headers = result['headers'] as Map<String, String>;
+        
+        // Получаем имя файла из заголовков или используем дефолтное
+        String filename = stage.fileUrl!.split('/').last;
+        if (headers.containsKey('content-disposition')) {
+          final contentDisposition = headers['content-disposition']!;
+          final filenamePattern = RegExp(r'filename[^;=\n]*=([^;\n]*)');
+          final match = filenamePattern.firstMatch(contentDisposition);
+          if (match != null) {
+            String? extracted = match.group(1);
+            if (extracted != null && extracted.isNotEmpty) {
+              extracted = extracted.trim();
+              if (extracted.startsWith('"') && extracted.endsWith('"')) {
+                extracted = extracted.substring(1, extracted.length - 1);
+              } else if (extracted.startsWith("'") && extracted.endsWith("'")) {
+                extracted = extracted.substring(1, extracted.length - 1);
+              }
+              if (extracted.isNotEmpty) {
+                filename = extracted;
+              }
+            }
+          }
+        }
+        
+        if (stage.fileUrl != null && stage.fileUrl!.isNotEmpty) {
+          _downloadFileFromUrl(stage.fileUrl!, filename);
+        } else {
           _downloadFileBytes(bytes, filename);
         }
       } else {

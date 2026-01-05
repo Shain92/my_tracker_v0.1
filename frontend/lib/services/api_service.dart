@@ -1276,6 +1276,235 @@ class ApiService {
     }
   }
 
+  /// Создание этапа проекта с файлом
+  static Future<Map<String, dynamic>> createProjectStageWithFile(
+    Map<String, dynamic> data,
+    PlatformFile? file,
+  ) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final uri = Uri.parse('$baseUrl/projects/project-stages/');
+      var request = http.MultipartRequest('POST', uri);
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Добавляем текстовые поля
+      data.forEach((key, value) {
+        if (value != null && value.toString().isNotEmpty && key != 'file') {
+          if (value is List) {
+            // Для списков в multipart/form-data используем формат с индексами
+            // Django REST Framework ожидает: field_name[0]=value1&field_name[1]=value2
+            for (int i = 0; i < value.length; i++) {
+              request.fields['$key[$i]'] = value[i].toString();
+            }
+          } else {
+            request.fields[key] = value.toString();
+          }
+        }
+      });
+
+      // Добавляем файл, если есть
+      if (file != null) {
+        if (file.bytes != null) {
+          // Для web
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              file.bytes!,
+              filename: file.name,
+            ),
+          );
+        } else if (file.path != null) {
+          // Для мобильных устройств
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'file',
+              file.path!,
+            ),
+          );
+        }
+      }
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            request = http.MultipartRequest('POST', uri);
+            request.headers['Authorization'] = 'Bearer $token';
+            data.forEach((key, value) {
+              if (value != null && key != 'file') {
+                if (value is List) {
+                  // Для списков в multipart/form-data используем формат с квадратными скобками
+                  for (var item in value) {
+                    request.fields['$key[]'] = item.toString();
+                  }
+                } else {
+                  request.fields[key] = value.toString();
+                }
+              }
+            });
+            if (file != null) {
+              if (file.bytes != null) {
+                request.files.add(
+                  http.MultipartFile.fromBytes(
+                    'file',
+                    file.bytes!,
+                    filename: file.name,
+                  ),
+                );
+              } else if (file.path != null) {
+                request.files.add(
+                  await http.MultipartFile.fromPath(
+                    'file',
+                    file.path!,
+                  ),
+                );
+              }
+            }
+            streamedResponse = await request.send();
+            response = await http.Response.fromStream(streamedResponse);
+          }
+        }
+      }
+
+      if (response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        return {'success': true, 'data': responseData};
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Ошибка создания этапа'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
+  /// Обновление этапа проекта с файлом
+  static Future<Map<String, dynamic>> updateProjectStageWithFile(
+    int id,
+    Map<String, dynamic> data,
+    PlatformFile? file,
+    bool deleteFile,
+  ) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final uri = Uri.parse('$baseUrl/projects/project-stages/$id/');
+      var request = http.MultipartRequest('PATCH', uri);
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Добавляем текстовые поля
+      data.forEach((key, value) {
+        if (value != null && value.toString().isNotEmpty && key != 'file') {
+          if (value is List) {
+            // Для списков в multipart/form-data используем формат с индексами
+            // Django REST Framework ожидает: field_name[0]=value1&field_name[1]=value2
+            for (int i = 0; i < value.length; i++) {
+              request.fields['$key[$i]'] = value[i].toString();
+            }
+          } else {
+            request.fields[key] = value.toString();
+          }
+        }
+      });
+
+      // Если нужно удалить файл
+      if (deleteFile) {
+        request.fields['file'] = '';
+      }
+
+      // Добавляем новый файл, если есть
+      if (file != null) {
+        if (file.bytes != null) {
+          // Для web
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              file.bytes!,
+              filename: file.name,
+            ),
+          );
+        } else if (file.path != null) {
+          // Для мобильных устройств
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'file',
+              file.path!,
+            ),
+          );
+        }
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            request = http.MultipartRequest('PATCH', uri);
+            request.headers['Authorization'] = 'Bearer $token';
+            data.forEach((key, value) {
+              if (value != null && key != 'file') {
+                if (value is List) {
+                  // Для списков в multipart/form-data используем формат с квадратными скобками
+                  for (var item in value) {
+                    request.fields['$key[]'] = item.toString();
+                  }
+                } else {
+                  request.fields[key] = value.toString();
+                }
+              }
+            });
+            if (deleteFile) {
+              request.fields['file'] = '';
+            }
+            if (file != null) {
+              if (file.bytes != null) {
+                request.files.add(
+                  http.MultipartFile.fromBytes(
+                    'file',
+                    file.bytes!,
+                    filename: file.name,
+                  ),
+                );
+              } else if (file.path != null) {
+                request.files.add(
+                  await http.MultipartFile.fromPath(
+                    'file',
+                    file.path!,
+                  ),
+                );
+              }
+            }
+            streamedResponse = await request.send();
+            response = await http.Response.fromStream(streamedResponse);
+          }
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        return {'success': true, 'data': responseData};
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Ошибка обновления этапа'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
   /// Получение проектных листов
   static Future<Map<String, dynamic>> getProjectSheets(int projectId) async {
     try {
@@ -1517,6 +1746,66 @@ class ApiService {
     }
   }
 
+  /// Скачивание файла этапа проекта
+  static Future<Map<String, dynamic>> downloadProjectStageFile(int stageId) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final uri = Uri.parse('$baseUrl/projects/project-stages/$stageId/download_file/');
+
+      var response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            response = await http.get(
+              uri,
+              headers: {
+                'Authorization': 'Bearer $token',
+              },
+            );
+          }
+        }
+      }
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'data': response.bodyBytes,
+          'headers': response.headers,
+        };
+      } else {
+        String errorMessage = 'Ошибка скачивания файла';
+        if (response.body.isNotEmpty) {
+          try {
+            final contentType = response.headers['content-type'] ?? '';
+            if (contentType.contains('application/json')) {
+              final error = jsonDecode(response.body);
+              errorMessage = error['error'] ?? errorMessage;
+            } else {
+              errorMessage = 'Сервер вернул неверный формат ответа (${response.statusCode})';
+            }
+          } catch (e) {
+            errorMessage = 'Ошибка обработки ответа: ${response.statusCode}';
+          }
+        }
+        return {'success': false, 'error': errorMessage};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
   /// Создание проектного листа с файлом
   static Future<Map<String, dynamic>> createProjectSheetWithFile(
     Map<String, dynamic> data,
@@ -1573,7 +1862,14 @@ class ApiService {
             request.headers['Authorization'] = 'Bearer $token';
             data.forEach((key, value) {
               if (value != null && key != 'file') {
-                request.fields[key] = value.toString();
+                if (value is List) {
+                  // Для списков в multipart/form-data используем формат с квадратными скобками
+                  for (var item in value) {
+                    request.fields['$key[]'] = item.toString();
+                  }
+                } else {
+                  request.fields[key] = value.toString();
+                }
               }
             });
             if (file != null) {
@@ -1675,7 +1971,14 @@ class ApiService {
             request.headers['Authorization'] = 'Bearer $token';
             data.forEach((key, value) {
               if (value != null && key != 'file') {
-                request.fields[key] = value.toString();
+                if (value is List) {
+                  // Для списков в multipart/form-data используем формат с квадратными скобками
+                  for (var item in value) {
+                    request.fields['$key[]'] = item.toString();
+                  }
+                } else {
+                  request.fields[key] = value.toString();
+                }
               }
             });
             if (deleteFile) {

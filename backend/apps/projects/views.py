@@ -244,6 +244,37 @@ class ProjectStageViewSet(viewsets.ModelViewSet):
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         return queryset
+    
+    @action(detail=True, methods=['get'])
+    def download_file(self, request, pk=None):
+        """Скачивание файла этапа проекта"""
+        stage = self.get_object()
+        if not stage.file:
+            return Response(
+                {'error': 'Файл не прикреплен'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            file_path = stage.file.path
+            if not os.path.exists(file_path):
+                return Response(
+                    {'error': 'Файл не найден на сервере'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            file_handle = open(file_path, 'rb')
+            response = FileResponse(
+                file_handle,
+                content_type='application/octet-stream'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
+            return response
+        except Exception as e:
+            return Response(
+                {'error': f'Ошибка при скачивании файла: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class ProjectSheetNoteViewSet(viewsets.ModelViewSet):

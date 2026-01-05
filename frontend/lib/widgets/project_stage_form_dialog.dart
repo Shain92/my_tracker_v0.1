@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/app_models.dart';
@@ -31,6 +32,8 @@ class _ProjectStageFormDialogState extends State<ProjectStageFormDialog> {
   List<UserModel> _selectedResponsibleUsers = [];
   bool _isLoading = false;
   bool _isLoadingStatuses = true;
+  PlatformFile? _selectedFile;
+  bool _deleteFile = false;
 
   @override
   void initState() {
@@ -156,6 +159,36 @@ class _ProjectStageFormDialogState extends State<ProjectStageFormDialog> {
     }
   }
 
+  /// Выбор файла
+  Future<void> _pickFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles();
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          _selectedFile = result.files.single;
+          _deleteFile = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка выбора файла: ${e.toString()}'),
+            backgroundColor: AppColors.accentPink,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Удаление файла
+  void _removeFile() {
+    setState(() {
+      _selectedFile = null;
+      _deleteFile = true;
+    });
+  }
+
   /// Сохранение этапа
   Future<void> _saveStage() async {
     if (!_formKey.currentState!.validate()) {
@@ -169,23 +202,37 @@ class _ProjectStageFormDialogState extends State<ProjectStageFormDialog> {
     final currentUser = await ApiService.getCurrentUser();
     final userId = currentUser?['id'] as int?;
 
-    final data = {
-      'project_id': widget.project.id,
+    final data = <String, dynamic>{
+      'project_id': widget.project.id.toString(),
       'datetime': _selectedDateTime.toIso8601String(),
-      'description': _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text.trim(),
-      if (_selectedStatus != null) 'status_id': _selectedStatus!.id,
-      if (userId != null) 'author_id': userId,
+      if (_descriptionController.text.trim().isNotEmpty)
+        'description': _descriptionController.text.trim(),
+      if (_selectedStatus != null) 'status_id': _selectedStatus!.id.toString(),
+      if (userId != null) 'author_id': userId.toString(),
       if (_selectedResponsibleUsers.isNotEmpty)
         'responsible_user_ids': _selectedResponsibleUsers.map((u) => u.id).toList(),
     };
 
     Map<String, dynamic> result;
     if (widget.stage == null) {
-      result = await ApiService.createProjectStage(data);
+      // Создание нового этапа
+      if (_selectedFile != null) {
+        result = await ApiService.createProjectStageWithFile(data, _selectedFile);
+      } else {
+        result = await ApiService.createProjectStage(data);
+      }
     } else {
-      result = await ApiService.updateProjectStage(widget.stage!.id, data);
+      // Обновление существующего этапа
+      if (_selectedFile != null || _deleteFile) {
+        result = await ApiService.updateProjectStageWithFile(
+          widget.stage!.id,
+          data,
+          _selectedFile,
+          _deleteFile,
+        );
+      } else {
+        result = await ApiService.updateProjectStage(widget.stage!.id, data);
+      }
     }
 
     if (mounted) {
@@ -433,6 +480,136 @@ class _ProjectStageFormDialogState extends State<ProjectStageFormDialog> {
                     prefixIcon: Icon(Icons.description),
                   ),
                   maxLines: 4,
+                ),
+                const SizedBox(height: 16),
+                // Работа с файлом
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSecondary.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.borderColor.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.attach_file,
+                            color: AppColors.accentBlue,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Файл',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Текущий файл (если есть и не удален)
+                      if (widget.stage?.fileUrl != null && 
+                          widget.stage!.fileUrl!.isNotEmpty && 
+                          !_deleteFile && 
+                          _selectedFile == null) ...[
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.insert_drive_file,
+                              color: AppColors.textSecondary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.stage!.fileUrl!.split('/').last,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, size: 18),
+                              color: AppColors.accentPink,
+                              onPressed: _removeFile,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      // Выбранный новый файл
+                      if (_selectedFile != null) ...[
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.insert_drive_file,
+                              color: AppColors.accentGreen,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _selectedFile!.name,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (_selectedFile!.size > 0) ...[
+                              Text(
+                                '${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              color: AppColors.accentPink,
+                              onPressed: () {
+                                setState(() {
+                                  _selectedFile = null;
+                                });
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      // Кнопка выбора файла
+                      OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _pickFile,
+                        icon: const Icon(Icons.upload_file, size: 18),
+                        label: Text(_selectedFile != null || 
+                            (widget.stage?.fileUrl != null && 
+                             widget.stage!.fileUrl!.isNotEmpty && 
+                             !_deleteFile)
+                            ? 'Заменить файл' 
+                            : 'Выбрать файл'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accentBlue,
+                          side: BorderSide(color: AppColors.accentBlue.withOpacity(0.5)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Row(
