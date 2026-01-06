@@ -46,6 +46,7 @@ class ProjectDetailScreen extends StatefulWidget {
 class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   bool _isLoading = true;
   int? _currentUserId;
+  int? _currentUserDepartmentId;
   bool _isLoadingDepartmentStats = false;
   List<DepartmentCompletionStats> _departmentStats = [];
   ProjectModel? _currentProject;
@@ -69,6 +70,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     if (user != null && mounted) {
       setState(() {
         _currentUserId = user['id'] as int?;
+        if (user['department_id'] != null) {
+          _currentUserDepartmentId = user['department_id'] as int;
+        } else {
+          _currentUserDepartmentId = null;
+        }
       });
     }
   }
@@ -780,19 +786,49 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   final index = entry.key;
                   final stats = entry.value;
                   final color = _parseColor(stats.departmentColor);
+                  final isUserDepartment = _currentUserDepartmentId != null && 
+                                           stats.departmentId == _currentUserDepartmentId;
                   
                   // Используем предвычисленную ширину
                   final segmentWidth = segmentWidths[index];
+                  final borderRadius = _getBorderRadiusForSegment(
+                    index,
+                    departmentsWithIncomplete.length,
+                  );
                   
                   return Container(
                     width: segmentWidth,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: _getBorderRadiusForSegment(
-                        index,
-                        departmentsWithIncomplete.length,
-                      ),
-                    ),
+                    decoration: isUserDepartment
+                        ? BoxDecoration(
+                            color: color,
+                            borderRadius: borderRadius,
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withOpacity(0.8),
+                                blurRadius: 4,
+                                spreadRadius: 0,
+                              ),
+                              BoxShadow(
+                                color: color.withOpacity(0.6),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                              BoxShadow(
+                                color: color.withOpacity(0.4),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                              BoxShadow(
+                                color: color.withOpacity(0.3),
+                                blurRadius: 16,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          )
+                        : BoxDecoration(
+                            color: color,
+                            borderRadius: borderRadius,
+                          ),
                   );
                 }).toList(),
               ),
@@ -811,6 +847,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 0,
                 (sum, s) => sum + s.incompleteSheets,
               );
+              final isUserDepartment = _currentUserDepartmentId != null && 
+                                       stats.departmentId == _currentUserDepartmentId;
               
               // Показываем процент только если есть невыполненные листы
               final percentageText = totalIncomplete > 0
@@ -823,17 +861,40 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   Container(
                     width: 12,
                     height: 12,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: isUserDepartment
+                        ? BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withOpacity(0.8),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                              BoxShadow(
+                                color: color.withOpacity(0.6),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              ),
+                              BoxShadow(
+                                color: color.withOpacity(0.4),
+                                blurRadius: 12,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          )
+                        : BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '${stats.departmentName}: ${stats.incompleteSheets}$percentageText',
                     style: TextStyle(
-                      color: AppColors.textSecondary,
+                      color: isUserDepartment ? color : AppColors.textSecondary,
                       fontSize: 11,
+                      fontWeight: isUserDepartment ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ],

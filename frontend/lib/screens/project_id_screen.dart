@@ -18,11 +18,13 @@ class _ProjectIdScreenState extends State<ProjectIdScreen> {
   List<ConstructionSiteModel> _constructionSites = [];
   bool _isLoading = true;
   String? _errorMessage;
+  int? _currentUserDepartmentId;
 
   @override
   void initState() {
     super.initState();
     _loadConstructionSites();
+    _loadCurrentUserDepartment();
   }
 
   /// Загрузка списка строительных участков
@@ -52,6 +54,20 @@ class _ProjectIdScreenState extends State<ProjectIdScreen> {
   /// Обновление списка
   Future<void> _refreshConstructionSites() async {
     await _loadConstructionSites();
+  }
+
+  /// Загрузка отдела текущего пользователя
+  Future<void> _loadCurrentUserDepartment() async {
+    final user = await ApiService.getCurrentUser();
+    if (mounted && user != null) {
+      setState(() {
+        if (user['department_id'] != null) {
+          _currentUserDepartmentId = user['department_id'] as int;
+        } else {
+          _currentUserDepartmentId = null;
+        }
+      });
+    }
   }
 
   /// Обновление одного участка в списке
@@ -255,6 +271,7 @@ class _ProjectIdScreenState extends State<ProjectIdScreen> {
                   constructionSite: _constructionSites[index],
                   onRefresh: () => _refreshConstructionSites(),
                   onConstructionSiteUpdated: (updatedSite) => _updateConstructionSite(updatedSite),
+                  currentUserDepartmentId: _currentUserDepartmentId,
                 );
               },
             ),
@@ -267,11 +284,13 @@ class _ConstructionSiteCard extends StatefulWidget {
   final ConstructionSiteModel constructionSite;
   final VoidCallback? onRefresh;
   final Function(ConstructionSiteModel)? onConstructionSiteUpdated;
+  final int? currentUserDepartmentId;
 
   const _ConstructionSiteCard({
     required this.constructionSite,
     this.onRefresh,
     this.onConstructionSiteUpdated,
+    this.currentUserDepartmentId,
   });
 
   @override
@@ -578,6 +597,7 @@ class _ConstructionSiteCardState extends State<_ConstructionSiteCard> {
                         isLoading: _isLoadingDepartmentStats,
                         compact: true,
                         showLegend: false,
+                        currentUserDepartmentId: widget.currentUserDepartmentId,
                       ),
                     ],
                   ),

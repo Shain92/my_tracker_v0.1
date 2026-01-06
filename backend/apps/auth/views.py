@@ -119,11 +119,26 @@ def login(request):
 def current_user(request):
     """Получение информации о текущем пользователе"""
     user = request.user
-    return Response({
+    response_data = {
         'id': user.id,
         'username': user.username,
         'is_superuser': user.is_superuser,
-    }, status=status.HTTP_200_OK)
+    }
+    
+    # Добавляем информацию об отделе, если есть профиль
+    if hasattr(user, 'profile') and user.profile.department:
+        department = user.profile.department
+        response_data['department_id'] = department.id
+        response_data['department'] = {
+            'id': department.id,
+            'name': department.name,
+            'color': department.color,
+        }
+    else:
+        response_data['department_id'] = None
+        response_data['department'] = None
+    
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

@@ -55,12 +55,16 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
   Map<int, bool> _projectHasCompletedSheets = {}; // projectId -> has completed sheets
   Map<int, bool> _projectHasIncompleteSheets = {}; // projectId -> has incomplete sheets
   bool _isLoadingDepartments = false;
+  
+  // Отдел текущего пользователя
+  int? _currentUserDepartmentId;
 
   @override
   void initState() {
     super.initState();
     _loadProjects();
     _loadDepartments();
+    _loadCurrentUserDepartment();
   }
 
   /// Загрузка проектов участка
@@ -101,6 +105,20 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
     await _loadProjects();
     _loadSummaryStats();
     _loadDepartments();
+  }
+
+  /// Загрузка отдела текущего пользователя
+  Future<void> _loadCurrentUserDepartment() async {
+    final user = await ApiService.getCurrentUser();
+    if (mounted && user != null) {
+      setState(() {
+        if (user['department_id'] != null) {
+          _currentUserDepartmentId = user['department_id'] as int;
+        } else {
+          _currentUserDepartmentId = null;
+        }
+      });
+    }
   }
 
   /// Загрузка сводной статистики по всем проектам
@@ -748,6 +766,7 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
                         constructionSite: widget.constructionSite,
                         onRefresh: () => _refreshProjects(),
                         onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                        currentUserDepartmentId: _currentUserDepartmentId,
                       )),
               ],
             ),
@@ -798,6 +817,7 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
               isLoading: _isLoadingSummaryStats,
               compact: false,
               showLegend: true,
+              currentUserDepartmentId: _currentUserDepartmentId,
             ),
           ] else ...[
             Row(
@@ -816,6 +836,7 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
                     isLoading: _isLoadingSummaryStats,
                     compact: false,
                     showLegend: true,
+                    currentUserDepartmentId: _currentUserDepartmentId,
                   ),
                 ),
               ],
@@ -1213,6 +1234,7 @@ class _ProjectCard extends StatefulWidget {
   final ConstructionSiteModel constructionSite;
   final VoidCallback? onRefresh;
   final Function(ProjectModel)? onProjectUpdated;
+  final int? currentUserDepartmentId;
 
   const _ProjectCard({
     super.key,
@@ -1220,6 +1242,7 @@ class _ProjectCard extends StatefulWidget {
     required this.constructionSite,
     this.onRefresh,
     this.onProjectUpdated,
+    this.currentUserDepartmentId,
   });
 
   @override
@@ -1548,6 +1571,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                     isLoading: _isLoadingDepartmentStats,
                     compact: true,
                     showLegend: false,
+                    currentUserDepartmentId: widget.currentUserDepartmentId,
                   ),
                 ],
               ),

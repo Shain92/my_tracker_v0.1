@@ -137,6 +137,7 @@ class DepartmentProgressBar extends StatelessWidget {
   final bool isLoading;
   final bool compact;
   final bool showLegend;
+  final int? currentUserDepartmentId;
 
   const DepartmentProgressBar({
     super.key,
@@ -144,6 +145,7 @@ class DepartmentProgressBar extends StatelessWidget {
     this.isLoading = false,
     this.compact = false,
     this.showLegend = true,
+    this.currentUserDepartmentId,
   });
 
   /// Преобразование HEX цвета в Color
@@ -189,6 +191,40 @@ class DepartmentProgressBar extends StatelessWidget {
     } else {
       return BorderRadius.zero;
     }
+  }
+
+  /// Создание эффекта неона для отдела пользователя
+  BoxDecoration _buildNeonDecoration(Color color, BorderRadius borderRadius) {
+    return BoxDecoration(
+      color: color,
+      borderRadius: borderRadius,
+      boxShadow: [
+        // Внутренняя тень с небольшим размытием
+        BoxShadow(
+          color: color.withOpacity(0.8),
+          blurRadius: 4,
+          spreadRadius: 0,
+        ),
+        // Средняя тень для усиления свечения
+        BoxShadow(
+          color: color.withOpacity(0.6),
+          blurRadius: 8,
+          spreadRadius: 1,
+        ),
+        // Внешняя тень с большим размытием для эффекта свечения
+        BoxShadow(
+          color: color.withOpacity(0.4),
+          blurRadius: 12,
+          spreadRadius: 2,
+        ),
+        // Дополнительная тень для более сильного эффекта
+        BoxShadow(
+          color: color.withOpacity(0.3),
+          blurRadius: 16,
+          spreadRadius: 3,
+        ),
+      ],
+    );
   }
 
   @override
@@ -351,16 +387,21 @@ class DepartmentProgressBar extends StatelessWidget {
                   final stats = entry.value;
                   final color = _parseColor(stats.departmentColor);
                   final segmentWidth = segmentWidths[index];
+                  final isUserDepartment = currentUserDepartmentId != null && 
+                                           stats.departmentId == currentUserDepartmentId;
+                  final borderRadius = _getBorderRadiusForSegment(
+                    index,
+                    departmentsWithIncomplete.length,
+                  );
                   
                   return Container(
                     width: segmentWidth,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: _getBorderRadiusForSegment(
-                        index,
-                        departmentsWithIncomplete.length,
-                      ),
-                    ),
+                    decoration: isUserDepartment
+                        ? _buildNeonDecoration(color, borderRadius)
+                        : BoxDecoration(
+                            color: color,
+                            borderRadius: borderRadius,
+                          ),
                   );
                 }).toList(),
               ),
@@ -378,6 +419,8 @@ class DepartmentProgressBar extends StatelessWidget {
                 0,
                 (sum, s) => sum + s.incompleteSheets,
               );
+              final isUserDepartment = currentUserDepartmentId != null && 
+                                       stats.departmentId == currentUserDepartmentId;
               
               final percentageText = totalIncomplete > 0
                   ? ' (${stats.incompletePercentage.toStringAsFixed(1)}%)'
@@ -389,17 +432,40 @@ class DepartmentProgressBar extends StatelessWidget {
                   Container(
                     width: 12,
                     height: 12,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: isUserDepartment
+                        ? BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withOpacity(0.8),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                              BoxShadow(
+                                color: color.withOpacity(0.6),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              ),
+                              BoxShadow(
+                                color: color.withOpacity(0.4),
+                                blurRadius: 12,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          )
+                        : BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '${stats.departmentName}: ${stats.incompleteSheets}$percentageText',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
+                    style: TextStyle(
+                      color: isUserDepartment ? color : AppColors.textSecondary,
                       fontSize: 11,
+                      fontWeight: isUserDepartment ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ],
