@@ -326,6 +326,66 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
     }
   }
 
+  /// Проверка соответствия проекта фильтру по статусу выполнения
+  bool _projectMatchesCompletionFilter(ProjectModel project) {
+    if (_completionFilter == CompletionFilter.all) {
+      return true;
+    }
+    
+    final percentage = project.completionPercentage;
+    
+    if (_completionFilter == CompletionFilter.completed) {
+      // Проект выполнен, если процент равен 100
+      return percentage != null && (percentage >= 100.0 || percentage >= 99.9);
+    } else if (_completionFilter == CompletionFilter.incomplete) {
+      // Проект не выполнен, если процент меньше 100 или null
+      return percentage == null || percentage < 99.9;
+    }
+    
+    return true;
+  }
+
+  /// Проверка соответствия проекта фильтру по отделу с учетом статуса выполнения
+  bool _projectMatchesDepartmentFilter(ProjectModel project) {
+    // Если отдел не выбран, фильтр по отделу не применяется
+    if (_selectedDepartmentId == null) {
+      return true;
+    }
+
+    // Если данные еще загружаются, не применяем фильтр по отделу
+    if (_isLoadingSummaryStats || _departmentProjects.isEmpty) {
+      return true;
+    }
+
+    final projectIds = _departmentProjects[_selectedDepartmentId];
+    
+    // Если у отдела нет проектов, проект не проходит фильтр
+    if (projectIds == null || projectIds.isEmpty) {
+      return false;
+    }
+
+    // Проверяем, принадлежит ли проект отделу
+    if (!projectIds.contains(project.id)) {
+      return false;
+    }
+
+    // Если выбран отдел, дополнительно проверяем статус выполнения задач отдела
+    // в зависимости от активного фильтра по статусу
+    if (_completionFilter == CompletionFilter.incomplete) {
+      // Для фильтра "Не выполнено": показываем только если у отдела есть невыполненные задачи
+      final incompleteSheets = _departmentIncompleteSheets[_selectedDepartmentId] ?? 0;
+      return incompleteSheets > 0;
+    } else if (_completionFilter == CompletionFilter.completed) {
+      // Для фильтра "Выполнено": показываем только если у отдела все задачи выполнены
+      final totalSheets = _departmentTotalSheets[_selectedDepartmentId] ?? 0;
+      final incompleteSheets = _departmentIncompleteSheets[_selectedDepartmentId] ?? 0;
+      return totalSheets > 0 && incompleteSheets == 0;
+    }
+
+    // Для фильтра "Все" просто проверяем принадлежность проекту
+    return true;
+  }
+
   /// Получить отфильтрованные проекты
   List<ProjectModel> _getFilteredProjects() {
     // Если проекты еще не загружены, возвращаем пустой список
@@ -333,41 +393,12 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
       return [];
     }
 
-    // Начинаем со всех проектов
-    List<ProjectModel> filtered = List.from(_projects);
-
-    // Фильтр по статусу выполнения
-    if (_completionFilter == CompletionFilter.completed) {
-      filtered = filtered.where((project) {
-        final percentage = project.completionPercentage;
-        // Проект выполнен, если процент равен 100
-        return percentage != null && (percentage >= 100.0 || percentage >= 99.9);
-      }).toList();
-    } else if (_completionFilter == CompletionFilter.incomplete) {
-      filtered = filtered.where((project) {
-        final percentage = project.completionPercentage;
-        // Проект не выполнен, если процент меньше 100 или null
-        return percentage == null || percentage < 99.9;
-      }).toList();
-    }
-    // Если _completionFilter == CompletionFilter.all, не фильтруем
-
-    // Фильтр по отделу
-    if (_selectedDepartmentId != null) {
-      // Применяем фильтр только если данные загружены
-      if (!_isLoadingSummaryStats && _departmentProjects.isNotEmpty) {
-        final projectIds = _departmentProjects[_selectedDepartmentId];
-        if (projectIds != null && projectIds.isNotEmpty) {
-          filtered = filtered.where((project) => projectIds.contains(project.id)).toList();
-        } else {
-          // Если у отдела нет проектов, возвращаем пустой список
-          filtered = [];
-        }
-      }
-      // Если данные еще загружаются, показываем все проекты (отфильтрованные по статусу)
-    }
-
-    return filtered;
+    // Применяем оба фильтра совместно
+    return _projects.where((project) {
+      // Проект должен соответствовать обоим фильтрам
+      return _projectMatchesCompletionFilter(project) && 
+             _projectMatchesDepartmentFilter(project);
+    }).toList();
   }
 
   /// Обновление одного проекта в списке

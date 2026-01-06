@@ -160,9 +160,10 @@ class UserViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         """Возвращает permissions в зависимости от действия"""
-        # Для чтения (list, retrieve) проверяем через PagePermission
+        # Для чтения (list, retrieve) - доступ для всех авторизованных пользователей
+        # Это необходимо для назначения начальника участка при создании Строительного Участка
         if self.action in ['list', 'retrieve']:
-            return [IsAuthenticated(), HasPagePermission('users_list')]
+            return [IsAuthenticated()]
         # Для создания, обновления, удаления - проверяем доступ к странице users_list
         # Суперпользователи всегда имеют доступ
         return [IsAuthenticated(), HasPagePermission('users_list')]
