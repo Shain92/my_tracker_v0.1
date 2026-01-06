@@ -4,11 +4,14 @@ import os
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, Count, F
 from django.utils import timezone
 from django.http import FileResponse, Http404
 from datetime import datetime, timedelta
 from django.contrib.auth.models import User
+
+from apps.auth.views import HasPagePermission
 
 from .models import (
     Status, ConstructionSite, Project, ProjectSheet,
@@ -114,6 +117,15 @@ class ConstructionSiteViewSet(viewsets.ModelViewSet):
     """ViewSet для строительных участков"""
     queryset = ConstructionSite.objects.all()
     serializer_class = ConstructionSiteSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_permissions(self):
+        """Возвращает permissions в зависимости от действия"""
+        # Для чтения (list, retrieve) - доступ для всех авторизованных пользователей
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        # Для создания, обновления, удаления - проверяем доступ к странице project_id
+        return [IsAuthenticated(), HasPagePermission('project_id')]
     
     def __init__(self, *args, **kwargs):
         # #region agent log
@@ -163,6 +175,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
     """ViewSet для проектов"""
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_permissions(self):
+        """Возвращает permissions в зависимости от действия"""
+        # Для чтения (list, retrieve) - доступ для всех авторизованных пользователей
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        # Для создания, обновления, удаления - проверяем доступ к странице projects
+        return [IsAuthenticated(), HasPagePermission('projects')]
     
     def get_queryset(self):
         """Фильтрация по строительному участку"""

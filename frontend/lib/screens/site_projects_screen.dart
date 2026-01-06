@@ -14,6 +14,13 @@ enum CompletionFilter {
   incomplete,
 }
 
+/// Фильтр по листам
+enum SheetsFilter {
+  all,
+  completed,
+  incomplete,
+}
+
 /// Экран проектов строительного участка
 class SiteProjectsScreen extends StatefulWidget {
   final ConstructionSiteModel constructionSite;
@@ -44,6 +51,9 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
   Map<int, Set<int>> _departmentProjects = {}; // departmentId -> Set of projectIds
   int? _selectedDepartmentId;
   CompletionFilter _completionFilter = CompletionFilter.all;
+  SheetsFilter _sheetsFilter = SheetsFilter.all;
+  Map<int, bool> _projectHasCompletedSheets = {}; // projectId -> has completed sheets
+  Map<int, bool> _projectHasIncompleteSheets = {}; // projectId -> has incomplete sheets
   bool _isLoadingDepartments = false;
 
   @override
@@ -118,11 +128,15 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
       // Агрегируем статистику по отделам из всех проектов
       final Map<int, progress_bars.DepartmentCompletionStats> statsMap = {};
       final Map<int, Set<int>> departmentProjects = {}; // departmentId -> Set of projectIds
+      final Map<int, bool> projectHasCompletedSheets = {}; // projectId -> has completed sheets
+      final Map<int, bool> projectHasIncompleteSheets = {}; // projectId -> has incomplete sheets
       int totalIncompleteSheets = 0;
 
       for (final project in _projects) {
         int currentPage = 1;
         bool hasMore = true;
+        bool hasCompleted = false;
+        bool hasIncomplete = false;
 
         while (hasMore && mounted) {
           final result = await ApiService.getProjectSheets(
@@ -139,6 +153,13 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
                   .toList();
 
               for (final sheet in pageSheets) {
+                // Отслеживаем наличие выполненных/невыполненных листов в проекте
+                if (sheet.isCompleted) {
+                  hasCompleted = true;
+                } else {
+                  hasIncomplete = true;
+                }
+
                 if (sheet.responsibleDepartment != null) {
                   final deptId = sheet.responsibleDepartment!.id;
 
@@ -194,6 +215,10 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
             hasMore = false;
           }
         }
+
+        // Сохраняем информацию о листах проекта
+        projectHasCompletedSheets[project.id] = hasCompleted;
+        projectHasIncompleteSheets[project.id] = hasIncomplete;
       }
 
       // Вычисляем проценты
@@ -226,6 +251,8 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
           _averageCompletionPercentage = averagePercentage;
           _summaryDepartmentStats = statsList;
           _departmentProjects = departmentProjects;
+          _projectHasCompletedSheets = projectHasCompletedSheets;
+          _projectHasIncompleteSheets = projectHasIncompleteSheets;
           _isLoadingSummaryStats = false;
         });
       }
@@ -345,6 +372,71 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
     return true;
   }
 
+  /// Проверка соответствия проекта фильтру по листам
+  bool _projectMatchesSheetsFilter(ProjectModel project) {
+    if (_sheetsFilter == SheetsFilter.all) {
+      return true;
+    }
+
+    // Если данные еще загружаются, не применяем фильтр
+    if (_isLoadingSummaryStats) {
+      return true;
+    }
+
+    // Если выбран отдел, проверяем листы этого отдела
+    if (_selectedDepartmentId != null) {
+      // Если данные отделов еще загружаются, не применяем фильтр
+      if (_isLoadingDepartments) {
+        return true;
+      }
+      
+      if (_departmentProjects.isNotEmpty) {
+        final projectIds = _departmentProjects[_selectedDepartmentId];
+        
+        // Проверяем, принадлежит ли проект отделу
+        if (projectIds == null || !projectIds.contains(project.id)) {
+          return false;
+        }
+
+        final totalSheets = _departmentTotalSheets[_selectedDepartmentId] ?? 0;
+        final incompleteSheets = _departmentIncompleteSheets[_selectedDepartmentId] ?? 0;
+        final completedSheets = totalSheets - incompleteSheets;
+
+        if (_sheetsFilter == SheetsFilter.completed) {
+          // Показываем только если у отдела есть выполненные листы
+          return completedSheets > 0;
+        } else if (_sheetsFilter == SheetsFilter.incomplete) {
+          // Показываем только если у отдела есть невыполненные листы
+          return incompleteSheets > 0;
+        }
+      }
+      // Если данные отделов еще не загружены, не применяем фильтр
+      return true;
+    }
+
+    // Если отдел не выбран, проверяем листы проекта в целом
+    // Проверяем, есть ли данные для этого проекта
+    final hasCompleted = _projectHasCompletedSheets[project.id];
+    final hasIncomplete = _projectHasIncompleteSheets[project.id];
+    
+    // Если данных нет для проекта, показываем его (данные еще загружаются)
+    // Данные должны быть загружены для всех проектов после завершения _loadSummaryStats
+    if (hasCompleted == null || hasIncomplete == null) {
+      // Если данные еще не загружены для этого проекта, показываем его
+      return true;
+    }
+
+    if (_sheetsFilter == SheetsFilter.completed) {
+      // Показываем проекты с выполненными листами
+      return hasCompleted;
+    } else if (_sheetsFilter == SheetsFilter.incomplete) {
+      // Показываем проекты с невыполненными листами
+      return hasIncomplete;
+    }
+
+    return true;
+  }
+
   /// Проверка соответствия проекта фильтру по отделу с учетом статуса выполнения
   bool _projectMatchesDepartmentFilter(ProjectModel project) {
     // Если отдел не выбран, фильтр по отделу не применяется
@@ -393,10 +485,11 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
       return [];
     }
 
-    // Применяем оба фильтра совместно
+    // Применяем все фильтры совместно
     return _projects.where((project) {
-      // Проект должен соответствовать обоим фильтрам
+      // Проект должен соответствовать всем фильтрам
       return _projectMatchesCompletionFilter(project) && 
+             _projectMatchesSheetsFilter(project) &&
              _projectMatchesDepartmentFilter(project);
     }).toList();
   }
@@ -745,7 +838,7 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
     );
   }
 
-  /// Фильтр по статусу выполнения
+  /// Фильтр по статусу выполнения и листам
   Widget _buildCompletionFilter(bool isMobile) {
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -756,57 +849,132 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
           color: AppColors.borderColor.withOpacity(0.3),
         ),
       ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.filter_list,
-            color: AppColors.accentBlue,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Text(
-            'Статус:',
-            style: TextStyle(
-              fontSize: isMobile ? 14 : 16,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
+      child: isMobile
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStatusFilterRow(isMobile),
+                const SizedBox(height: 12),
+                _buildSheetsFilterRow(isMobile),
+              ],
+            )
+          : Row(
+              children: [
+                _buildStatusFilterRow(isMobile),
+                const Spacer(),
+                _buildSheetsFilterRow(isMobile),
+              ],
             ),
+    );
+  }
+
+  /// Строка фильтра по статусу
+  Widget _buildStatusFilterRow(bool isMobile) {
+    return Row(
+      children: [
+        const Icon(
+          Icons.filter_list,
+          color: AppColors.accentBlue,
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        Text(
+          'Статус:',
+          style: TextStyle(
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
           ),
-          const SizedBox(width: 16),
-          _buildFilterIcon(
-            icon: Icons.filter_list,
-            label: 'Все',
-            isSelected: _completionFilter == CompletionFilter.all,
-            onTap: () {
-              setState(() {
-                _completionFilter = CompletionFilter.all;
-              });
-            },
+        ),
+        const SizedBox(width: 16),
+        _buildFilterIcon(
+          icon: Icons.filter_list,
+          label: 'Все',
+          isSelected: _completionFilter == CompletionFilter.all,
+          onTap: () {
+            setState(() {
+              _completionFilter = CompletionFilter.all;
+            });
+          },
+        ),
+        const SizedBox(width: 12),
+        _buildFilterIcon(
+          icon: Icons.check_circle,
+          label: 'Выполнено',
+          isSelected: _completionFilter == CompletionFilter.completed,
+          onTap: () {
+            setState(() {
+              _completionFilter = CompletionFilter.completed;
+            });
+          },
+        ),
+        const SizedBox(width: 12),
+        _buildFilterIcon(
+          icon: Icons.cancel,
+          label: 'Не выполнено',
+          isSelected: _completionFilter == CompletionFilter.incomplete,
+          onTap: () {
+            setState(() {
+              _completionFilter = CompletionFilter.incomplete;
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Строка фильтра по листам
+  Widget _buildSheetsFilterRow(bool isMobile) {
+    return Row(
+      children: [
+        const Icon(
+          Icons.description,
+          color: AppColors.accentBlue,
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        Text(
+          'Листы:',
+          style: TextStyle(
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
           ),
-          const SizedBox(width: 12),
-          _buildFilterIcon(
-            icon: Icons.check_circle,
-            label: 'Выполнено',
-            isSelected: _completionFilter == CompletionFilter.completed,
-            onTap: () {
-              setState(() {
-                _completionFilter = CompletionFilter.completed;
-              });
-            },
-          ),
-          const SizedBox(width: 12),
-          _buildFilterIcon(
-            icon: Icons.cancel,
-            label: 'Не выполнено',
-            isSelected: _completionFilter == CompletionFilter.incomplete,
-            onTap: () {
-              setState(() {
-                _completionFilter = CompletionFilter.incomplete;
-              });
-            },
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 16),
+        _buildFilterIcon(
+          icon: Icons.filter_list,
+          label: 'Все',
+          isSelected: _sheetsFilter == SheetsFilter.all,
+          onTap: () {
+            setState(() {
+              _sheetsFilter = SheetsFilter.all;
+            });
+          },
+        ),
+        const SizedBox(width: 12),
+        _buildFilterIcon(
+          icon: Icons.check_circle,
+          label: 'Выполненные',
+          isSelected: _sheetsFilter == SheetsFilter.completed,
+          onTap: () {
+            setState(() {
+              _sheetsFilter = SheetsFilter.completed;
+            });
+          },
+        ),
+        const SizedBox(width: 12),
+        _buildFilterIcon(
+          icon: Icons.cancel,
+          label: 'Не выполненные',
+          isSelected: _sheetsFilter == SheetsFilter.incomplete,
+          onTap: () {
+            setState(() {
+              _sheetsFilter = SheetsFilter.incomplete;
+            });
+          },
+        ),
+      ],
     );
   }
 
