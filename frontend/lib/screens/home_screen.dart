@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } else {
-      _allowedPages = {'home', 'tasks', 'projects', 'settings', 'users_list', 'departments_list'};
+      _allowedPages = {'home', 'tasks', 'projects', 'settings', 'users_list', 'departments_list', 'project_id', 'statuses_list'};
     }
     
     if (mounted) {

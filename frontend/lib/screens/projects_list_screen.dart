@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 import 'project_id_screen.dart';
 import 'project_materials_screen.dart';
 import 'project_works_screen.dart';
@@ -13,6 +14,54 @@ class ProjectsListScreen extends StatefulWidget {
 }
 
 class _ProjectsListScreenState extends State<ProjectsListScreen> {
+  bool _isLoading = true;
+  bool _isSuperuser = false;
+  Set<String> _allowedPages = {'home'};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserPermissions();
+  }
+
+  /// Загрузка прав доступа пользователя
+  Future<void> _loadUserPermissions() async {
+    bool isSuperuser = await ApiService.getIsSuperuser();
+    
+    if (!isSuperuser) {
+      final userData = await ApiService.getCurrentUser();
+      if (userData != null && userData['is_superuser'] != null) {
+        isSuperuser = userData['is_superuser'] as bool;
+      }
+    }
+    
+    if (!isSuperuser) {
+      final permissionsResult = await ApiService.getUserPagePermissions();
+      if (permissionsResult['success'] == true) {
+        final data = permissionsResult['data'];
+        if (data != null && data['pages'] != null) {
+          final pages = data['pages'] as List;
+          _allowedPages = pages.map((p) => p.toString()).toSet();
+        }
+      }
+    } else {
+      _allowedPages = {'home', 'tasks', 'projects', 'settings', 'users_list', 'departments_list', 'project_id', 'statuses_list'};
+    }
+    
+    if (mounted) {
+      setState(() {
+        _isSuperuser = isSuperuser;
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Проверка доступа к странице
+  bool _hasAccess(String pageId) {
+    if (_isSuperuser) return true;
+    return _allowedPages.contains(pageId);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -89,11 +138,37 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
   }
 
   Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
     final isMobile = MediaQuery.of(context).size.width < 600;
     final isTablet = MediaQuery.of(context).size.width >= 600 && MediaQuery.of(context).size.width < 900;
     
     final crossAxisCount = isMobile ? 1 : (isTablet ? 2 : 3);
     final childAspectRatio = isMobile ? 3.0 : 2.4;
+    
+    final cards = <Widget>[];
+    
+    if (_hasAccess('project_id')) {
+      cards.add(
+        _SectionCard(
+          title: 'ИД',
+          icon: Icons.description,
+          color: AppColors.accentBlue,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ProjectIdScreen(),
+              ),
+            );
+          },
+        ),
+      );
+    }
     
     return Padding(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -103,19 +178,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
         mainAxisSpacing: 16,
         childAspectRatio: childAspectRatio,
         children: [
-          _SectionCard(
-            title: 'ИД',
-            icon: Icons.description,
-            color: AppColors.accentBlue,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ProjectIdScreen(),
-                ),
-              );
-            },
-          ),
+          ...cards,
           _SectionCard(
             title: 'Материалы',
             icon: Icons.inventory,

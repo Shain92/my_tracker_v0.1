@@ -45,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       }
     } else {
-      _allowedPages = {'home', 'tasks', 'settings', 'users_list', 'departments_list'};
+      _allowedPages = {'home', 'tasks', 'projects', 'settings', 'users_list', 'departments_list', 'project_id', 'statuses_list'};
     }
     
     if (mounted) {
@@ -135,19 +135,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Системные настройки',
                     icon: Icons.tune,
                     children: [
-                      _SettingsCard(
-                        title: 'Статусы',
-                        description: 'Просмотр и управление статусами проектных листов и этапов',
-                        icon: Icons.label,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const StatusesListScreen(),
-                            ),
-                          );
-                        },
-                      ),
+                      if (_hasAccess('statuses_list'))
+                        _SettingsCard(
+                          title: 'Статусы',
+                          description: 'Просмотр и управление статусами проектных листов и этапов',
+                          icon: Icons.label,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const StatusesListScreen(),
+                              ),
+                            );
+                          },
+                        ),
                       _SettingsCard(
                         title: 'Конфигурация базы данных',
                         description: 'Настройки подключения к базе данных',

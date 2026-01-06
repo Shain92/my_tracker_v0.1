@@ -52,7 +52,7 @@ class _AppSidebarState extends State<AppSidebar> {
       }
     } else {
       // Суперпользователь имеет доступ ко всем страницам
-      _allowedPages = {'home', 'tasks', 'projects', 'settings', 'users_list', 'departments_list'};
+      _allowedPages = {'home', 'tasks', 'projects', 'settings', 'users_list', 'departments_list', 'project_id', 'statuses_list'};
     }
     
     if (mounted) {

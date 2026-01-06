@@ -62,9 +62,12 @@ class PagePermission(models.Model):
     PAGE_CHOICES = [
         ('home', 'Главная'),
         ('tasks', 'Задачи'),
+        ('projects', 'Проекты'),
         ('settings', 'Настройки'),
         ('users_list', 'Список пользователей'),
         ('departments_list', 'Список отделов'),
+        ('project_id', 'Строительные участки'),
+        ('statuses_list', 'Статусы'),
     ]
     
     page_name = models.CharField(
