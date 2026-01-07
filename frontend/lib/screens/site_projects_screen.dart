@@ -870,70 +870,102 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
           color: AppColors.borderColor.withOpacity(0.3),
         ),
       ),
-      child: isMobile
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildStatusFilterRow(isMobile),
-                const SizedBox(height: 12),
-                _buildSheetsFilterRow(isMobile),
-              ],
-            )
-          : Row(
-              children: [
-                _buildStatusFilterRow(isMobile),
-                const Spacer(),
-                _buildSheetsFilterRow(isMobile),
-              ],
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: _buildFilterGroup(
+              title: 'Статусы',
+              icon: Icons.filter_list,
+              child: _buildStatusFilterRow(isMobile),
+              isMobile: isMobile,
             ),
+          ),
+          Container(
+            width: 1,
+            margin: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 16),
+            color: AppColors.borderColor.withOpacity(0.3),
+          ),
+          Expanded(
+            child: _buildFilterGroup(
+              title: 'Листы',
+              icon: Icons.description,
+              child: _buildSheetsFilterRow(isMobile),
+              isMobile: isMobile,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Группа фильтров с заголовком
+  Widget _buildFilterGroup({
+    required String title,
+    required IconData icon,
+    required Widget child,
+    required bool isMobile,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              icon,
+              size: isMobile ? 18 : 20,
+              color: AppColors.accentBlue,
+            ),
+            SizedBox(width: isMobile ? 8 : 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: isMobile ? 14 : 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isMobile ? 8 : 12),
+        child,
+      ],
     );
   }
 
   /// Строка фильтра по статусу
   Widget _buildStatusFilterRow(bool isMobile) {
-    return Row(
+    return Wrap(
+      spacing: isMobile ? 8 : 12,
+      runSpacing: isMobile ? 8 : 12,
       children: [
-        const Icon(
-          Icons.filter_list,
-          color: AppColors.accentBlue,
-          size: 20,
-        ),
-        const SizedBox(width: 12),
-        Text(
-          'Статус:',
-          style: TextStyle(
-            fontSize: isMobile ? 14 : 16,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(width: 16),
         _buildFilterIcon(
           icon: Icons.filter_list,
           label: 'Все',
           isSelected: _completionFilter == CompletionFilter.all,
+          isMobile: isMobile,
           onTap: () {
             setState(() {
               _completionFilter = CompletionFilter.all;
             });
           },
         ),
-        const SizedBox(width: 12),
         _buildFilterIcon(
           icon: Icons.check_circle,
           label: 'Выполнено',
           isSelected: _completionFilter == CompletionFilter.completed,
+          isMobile: isMobile,
           onTap: () {
             setState(() {
               _completionFilter = CompletionFilter.completed;
             });
           },
         ),
-        const SizedBox(width: 12),
         _buildFilterIcon(
           icon: Icons.cancel,
           label: 'Не выполнено',
           isSelected: _completionFilter == CompletionFilter.incomplete,
+          isMobile: isMobile,
           onTap: () {
             setState(() {
               _completionFilter = CompletionFilter.incomplete;
@@ -946,49 +978,37 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
 
   /// Строка фильтра по листам
   Widget _buildSheetsFilterRow(bool isMobile) {
-    return Row(
+    return Wrap(
+      spacing: isMobile ? 8 : 12,
+      runSpacing: isMobile ? 8 : 12,
       children: [
-        const Icon(
-          Icons.description,
-          color: AppColors.accentBlue,
-          size: 20,
-        ),
-        const SizedBox(width: 12),
-        Text(
-          'Листы:',
-          style: TextStyle(
-            fontSize: isMobile ? 14 : 16,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(width: 16),
         _buildFilterIcon(
           icon: Icons.filter_list,
           label: 'Все',
           isSelected: _sheetsFilter == SheetsFilter.all,
+          isMobile: isMobile,
           onTap: () {
             setState(() {
               _sheetsFilter = SheetsFilter.all;
             });
           },
         ),
-        const SizedBox(width: 12),
         _buildFilterIcon(
           icon: Icons.check_circle,
           label: 'Выполненные',
           isSelected: _sheetsFilter == SheetsFilter.completed,
+          isMobile: isMobile,
           onTap: () {
             setState(() {
               _sheetsFilter = SheetsFilter.completed;
             });
           },
         ),
-        const SizedBox(width: 12),
         _buildFilterIcon(
           icon: Icons.cancel,
           label: 'Не выполненные',
           isSelected: _sheetsFilter == SheetsFilter.incomplete,
+          isMobile: isMobile,
           onTap: () {
             setState(() {
               _sheetsFilter = SheetsFilter.incomplete;
@@ -1005,12 +1025,13 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
+    bool isMobile = false,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.all(isMobile ? 8 : 10),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.accentBlue.withOpacity(0.3)
@@ -1021,24 +1042,10 @@ class _SiteProjectsScreenState extends State<SiteProjectsScreen> {
             width: isSelected ? 2 : 1,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected ? AppColors.accentBlue : AppColors.textSecondary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isSelected ? AppColors.accentBlue : AppColors.textSecondary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
+        child: Icon(
+          icon,
+          size: isMobile ? 20 : 22,
+          color: isSelected ? AppColors.accentBlue : AppColors.textSecondary,
         ),
       ),
     );
