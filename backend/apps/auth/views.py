@@ -410,7 +410,10 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         # Для просмотра одного отдела (retrieve) проверяем через PagePermission
         if self.action == 'retrieve':
             return [IsAuthenticated(), HasPagePermission('departments_list')]
-        # Для создания, обновления, удаления - только суперпользователи
+        # Для создания, обновления и удаления - пользователи с доступом к странице отделов
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), HasPagePermission('departments_list')]
+        # Для остальных действий - только суперпользователи
         return [IsAuthenticated(), IsAdminUser()]
     
     def get_serializer_class(self):

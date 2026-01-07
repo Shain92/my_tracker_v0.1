@@ -511,7 +511,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Информация о проекте',
+                  'Информация',
                   style: TextStyle(
                     fontSize: isMobile ? 18 : 20,
                     fontWeight: FontWeight.bold,
