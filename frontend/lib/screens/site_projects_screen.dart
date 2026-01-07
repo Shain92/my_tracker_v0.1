@@ -1476,119 +1476,123 @@ class _ProjectCardState extends State<_ProjectCard> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-            // Иконка проекта
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.accentBlue.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.accentBlue,
-                  width: 2,
-                ),
-              ),
-              child: const Icon(
-                Icons.folder,
-                size: 32,
-                color: AppColors.accentBlue,
-              ),
-            ),
-            const SizedBox(width: 16),
-            // Информация о проекте
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.project.name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (widget.project.description != null &&
-                      widget.project.description!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.project.description!,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
+                // Иконка проекта и кнопка редактирования
+                Column(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: AppColors.accentBlue.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.accentBlue,
+                          width: 2,
+                        ),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      child: const Icon(
+                        Icons.folder,
+                        size: 32,
+                        color: AppColors.accentBlue,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _ActionButton(
+                      icon: Icons.edit,
+                      color: AppColors.accentBlue,
+                      onTap: () => _showEditDialog(context),
                     ),
                   ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 8,
+                ),
+                const SizedBox(width: 16),
+                // Информация о проекте
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.tag,
-                            size: 16,
+                      Text(
+                        widget.project.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (widget.project.description != null &&
+                          widget.project.description!.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.project.description!,
+                          style: const TextStyle(
+                            fontSize: 14,
                             color: AppColors.textSecondary,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Код: ${widget.project.code}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 8,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.tag,
+                                size: 16,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Код: ${widget.project.code}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.code,
+                                size: 16,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Шифр: ${widget.project.cipher}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.code,
-                            size: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Шифр: ${widget.project.cipher}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 12),
+                      // Общая шкала выполнения
+                      progress_bars.OverallProgressBar(
+                        completionPercentage: widget.project.completionPercentage,
+                        compact: true,
+                        status: _lastStage?.status,
+                      ),
+                      const SizedBox(height: 8),
+                      // Шкала по отделам
+                      progress_bars.DepartmentProgressBar(
+                        departmentStats: _departmentStats,
+                        isLoading: _isLoadingDepartmentStats,
+                        compact: true,
+                        showLegend: false,
+                        currentUserDepartmentId: widget.currentUserDepartmentId,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Общая шкала выполнения
-                  progress_bars.OverallProgressBar(
-                    completionPercentage: widget.project.completionPercentage,
-                    compact: true,
-                    status: _lastStage?.status,
-                  ),
-                  const SizedBox(height: 8),
-                  // Шкала по отделам
-                  progress_bars.DepartmentProgressBar(
-                    departmentStats: _departmentStats,
-                    isLoading: _isLoadingDepartmentStats,
-                    compact: true,
-                    showLegend: false,
-                    currentUserDepartmentId: widget.currentUserDepartmentId,
-                  ),
-                ],
-              ),
-            ),
-            // Кнопка редактирования
-            _ActionButton(
-              icon: Icons.edit,
-              color: AppColors.accentBlue,
-              onTap: () => _showEditDialog(context),
-            ),
+                ),
               ],
             ),
           ),
