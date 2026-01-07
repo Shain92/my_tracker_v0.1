@@ -200,11 +200,38 @@ class ProjectSheetViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSheetSerializer
     
     def get_queryset(self):
-        """Фильтрация по проекту и сортировка"""
+        """Фильтрация по проекту, отделу и сортировка"""
         queryset = super().get_queryset()
+        
+        # Фильтр по отделу пользователя
+        department_id = self.request.query_params.get('department_id')
+        if department_id:
+            queryset = queryset.filter(responsible_department_id=department_id)
+        elif hasattr(self.request, 'user') and self.request.user.is_authenticated:
+            # Получаем отдел из профиля пользователя
+            try:
+                user_profile = self.request.user.profile
+                if user_profile and user_profile.department:
+                    queryset = queryset.filter(responsible_department=user_profile.department)
+            except AttributeError:
+                # Если профиль не существует, пропускаем фильтр
+                pass
+        
+        # Фильтр по проекту
         project_id = self.request.query_params.get('project_id')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
+        
+        # Фильтр по строительному участку
+        construction_site_id = self.request.query_params.get('construction_site_id')
+        if construction_site_id:
+            queryset = queryset.filter(project__construction_site_id=construction_site_id)
+        
+        # Фильтр по статусу выполнения
+        is_completed = self.request.query_params.get('is_completed')
+        if is_completed is not None:
+            is_completed_bool = is_completed.lower() in ('true', '1', 'yes')
+            queryset = queryset.filter(is_completed=is_completed_bool)
         
         # Сортировка: 1. Выполненные внизу, 2. По отделам, 3. По алфавиту
         queryset = queryset.order_by(
@@ -266,11 +293,34 @@ class ProjectStageViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectStageSerializer
     
     def get_queryset(self):
-        """Фильтрация по проекту"""
+        """Фильтрация по проекту и пользователю"""
         queryset = super().get_queryset()
+        
+        # Фильтр по пользователю (если указан user_id или используем текущего)
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                user = None
+        else:
+            user = self.request.user if hasattr(self.request, 'user') else None
+        
+        if user and user.is_authenticated:
+            queryset = queryset.filter(
+                Q(responsible_users=user) | Q(author=user)
+            ).distinct()
+        
+        # Фильтр по проекту
         project_id = self.request.query_params.get('project_id')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
+        
+        # Фильтр по строительному участку
+        construction_site_id = self.request.query_params.get('construction_site_id')
+        if construction_site_id:
+            queryset = queryset.filter(project__construction_site_id=construction_site_id)
+        
         return queryset
     
     @action(detail=True, methods=['get'])

@@ -2323,5 +2323,166 @@ class ApiService {
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
     }
   }
+
+  /// Получение этапов текущего пользователя с фильтрами
+  static Future<Map<String, dynamic>> getUserStages({
+    int? constructionSiteId,
+    int? projectId,
+    bool? isCompleted,
+    int page = 1,
+    int pageSize = 100,
+  }) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'page_size': pageSize.toString(),
+      };
+
+      if (constructionSiteId != null) {
+        queryParams['construction_site_id'] = constructionSiteId.toString();
+      }
+      if (projectId != null) {
+        queryParams['project_id'] = projectId.toString();
+      }
+
+      final uri = Uri.parse('$baseUrl/projects/project-stages/').replace(
+        queryParameters: queryParams,
+      );
+
+      var response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            response = await http.get(
+              uri,
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            );
+          }
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        List<dynamic> results = [];
+        if (data is Map<String, dynamic> && data.containsKey('results')) {
+          results = data['results'] as List? ?? [];
+        } else if (data is List) {
+          results = data;
+        }
+
+        // Фильтрация по is_completed на клиенте (если нужно)
+        // Примечание: для этапов "выполнено" определяется через статус
+        // Здесь мы просто возвращаем все этапы, фильтрация будет на frontend
+        
+        return {
+          'success': true,
+          'data': results,
+        };
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Ошибка получения этапов пользователя'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
+  /// Получение листов отдела текущего пользователя с фильтрами
+  static Future<Map<String, dynamic>> getDepartmentSheets({
+    int? constructionSiteId,
+    int? projectId,
+    bool? isCompleted,
+    int page = 1,
+    int pageSize = 100,
+  }) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'page_size': pageSize.toString(),
+      };
+
+      if (constructionSiteId != null) {
+        queryParams['construction_site_id'] = constructionSiteId.toString();
+      }
+      if (projectId != null) {
+        queryParams['project_id'] = projectId.toString();
+      }
+      if (isCompleted != null) {
+        queryParams['is_completed'] = isCompleted.toString();
+      }
+
+      final uri = Uri.parse('$baseUrl/projects/project-sheets/').replace(
+        queryParameters: queryParams,
+      );
+
+      var response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            response = await http.get(
+              uri,
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            );
+          }
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        List<dynamic> results = [];
+        if (data is Map<String, dynamic> && data.containsKey('results')) {
+          results = data['results'] as List? ?? [];
+        } else if (data is List) {
+          results = data;
+        }
+        
+        return {
+          'success': true,
+          'data': results,
+        };
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Ошибка получения листов отдела'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
 }
 
