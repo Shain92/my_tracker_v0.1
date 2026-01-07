@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../theme/app_theme.dart';
 import '../models/app_models.dart';
+import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../widgets/project_stage_form_dialog.dart';
 import '../widgets/project_sheet_form_dialog.dart';
@@ -1415,10 +1416,15 @@ class _SheetsColumnWidget extends StatefulWidget {
 
 class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
   List<ProjectSheetModel> _sheets = [];
+  List<ProjectSheetModel> _allSheets = []; // Все загруженные листы без фильтрации
   bool _isLoading = false;
   int _currentPage = 1;
   int _totalPages = 1;
   int _totalCount = 0;
+  
+  // Состояние фильтров
+  Set<int>? _selectedDepartmentIds;
+  String? _completionFilter; // 'all', 'completed', 'incomplete'
 
   @override
   void initState() {
@@ -1446,10 +1452,12 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
           _isLoading = false;
           final data = result['data'];
           if (data is List) {
-            _sheets = data
+            _allSheets = data
                 .map((s) => ProjectSheetModel.fromJson(s as Map<String, dynamic>))
                 .toList();
+            _sheets = _applyFilters(_allSheets.isNotEmpty ? _allSheets : []);
           } else {
+            _allSheets = [];
             _sheets = [];
           }
 
@@ -1461,7 +1469,7 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
           } else {
             _currentPage = 1;
             _totalPages = 1;
-            _totalCount = _sheets.length;
+            _totalCount = _allSheets.length;
           }
         });
       }
@@ -1469,6 +1477,7 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _allSheets = [];
           _sheets = [];
           _currentPage = 1;
           _totalPages = 1;
@@ -1481,6 +1490,279 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
   void refresh() {
     _currentPage = 1;
     _loadSheets();
+  }
+
+  /// Проверка наличия активных фильтров
+  bool _hasActiveFilters() {
+    return (_selectedDepartmentIds != null && _selectedDepartmentIds!.isNotEmpty) ||
+           (_completionFilter != null && _completionFilter != 'all');
+  }
+
+  /// Применение фильтров к списку листов
+  List<ProjectSheetModel> _applyFilters(List<ProjectSheetModel> sheets) {
+    if (sheets.isEmpty || sheets.length == 0) return [];
+    try {
+      return sheets.where((sheet) {
+        // Фильтр по отделам
+        if (_selectedDepartmentIds != null && _selectedDepartmentIds!.isNotEmpty) {
+          // Получаем ID отдела из responsibleDepartmentId или из объекта responsibleDepartment
+          final departmentId = sheet.responsibleDepartmentId ?? 
+                               sheet.responsibleDepartment?.id;
+          
+          // Если у листа нет отдела, исключаем его из результатов
+          if (departmentId == null) {
+            return false;
+          }
+          
+          // Проверяем, есть ли ID отдела в выбранных
+          if (!_selectedDepartmentIds!.contains(departmentId)) {
+            return false;
+          }
+        }
+        // Фильтр по выполнению
+        if (_completionFilter == 'completed' && !sheet.isCompleted) return false;
+        if (_completionFilter == 'incomplete' && sheet.isCompleted) return false;
+        return true;
+      }).toList();
+    } catch (e) {
+      // В случае ошибки возвращаем пустой список
+      return [];
+    }
+  }
+
+  /// Обновление фильтров и применение их к списку
+  void _updateFilters() {
+    setState(() {
+      _sheets = _applyFilters(_allSheets.isNotEmpty ? _allSheets : []);
+    });
+  }
+
+  /// Показ модального окна фильтров
+  Future<void> _showFilterDialog() async {
+    List<DepartmentModel> departments = [];
+    bool isLoadingDepartments = true;
+    Set<int> tempSelectedDepartmentIds = _selectedDepartmentIds != null
+        ? Set<int>.from(_selectedDepartmentIds!)
+        : <int>{};
+    String? tempCompletionFilter = _completionFilter ?? 'all';
+
+    // Загружаем отделы
+    final deptResult = await ApiService.getDepartments();
+    if (deptResult['success'] == true) {
+      final data = deptResult['data'] as List;
+      departments = data
+          .map((d) => DepartmentModel.fromJson(d as Map<String, dynamic>))
+          .toList();
+      isLoadingDepartments = false;
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: AppColors.cardBackground,
+            title: const Text(
+              'Фильтры',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Фильтр по отделам
+                    const Text(
+                      'По отделам:',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (isLoadingDepartments)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (departments.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Text(
+                          'Нет отделов',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      )
+                    else
+                      ...departments.map((dept) {
+                        final isSelected = tempSelectedDepartmentIds.contains(dept.id);
+                        return CheckboxListTile(
+                          title: Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: _parseColor(dept.color),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  dept.name,
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          value: isSelected,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                tempSelectedDepartmentIds.add(dept.id);
+                              } else {
+                                tempSelectedDepartmentIds.remove(dept.id);
+                              }
+                            });
+                          },
+                          activeColor: AppColors.accentBlue,
+                          contentPadding: EdgeInsets.zero,
+                        );
+                      }),
+                    const SizedBox(height: 24),
+                    // Фильтр по выполнению
+                    const Text(
+                      'По выполнению:',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    RadioListTile<String>(
+                      title: const Text(
+                        'Все',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                      value: 'all',
+                      groupValue: tempCompletionFilter,
+                      onChanged: (value) {
+                        setDialogState(() {
+                          tempCompletionFilter = value;
+                        });
+                      },
+                      activeColor: AppColors.accentBlue,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    RadioListTile<String>(
+                      title: const Text(
+                        'Выполнено',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                      value: 'completed',
+                      groupValue: tempCompletionFilter,
+                      onChanged: (value) {
+                        setDialogState(() {
+                          tempCompletionFilter = value;
+                        });
+                      },
+                      activeColor: AppColors.accentBlue,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    RadioListTile<String>(
+                      title: const Text(
+                        'Не выполнено',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                      value: 'incomplete',
+                      groupValue: tempCompletionFilter,
+                      onChanged: (value) {
+                        setDialogState(() {
+                          tempCompletionFilter = value;
+                        });
+                      },
+                      activeColor: AppColors.accentBlue,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  setDialogState(() {
+                    tempSelectedDepartmentIds.clear();
+                    tempCompletionFilter = 'all';
+                  });
+                },
+                child: const Text(
+                  'Сбросить',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Отмена',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    // Создаем новый Set для избежания проблем с ссылками
+                    _selectedDepartmentIds = tempSelectedDepartmentIds.isEmpty
+                        ? null
+                        : Set<int>.from(tempSelectedDepartmentIds);
+                    _completionFilter = tempCompletionFilter == 'all'
+                        ? null
+                        : tempCompletionFilter;
+                    _updateFilters();
+                  });
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentBlue,
+                ),
+                child: const Text(
+                  'Применить',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -1515,6 +1797,37 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
                       color: AppColors.textPrimary,
                     ),
                   ),
+                ),
+                IconButton(
+                  onPressed: _showFilterDialog,
+                  icon: Stack(
+                    children: [
+                      Icon(
+                        Icons.filter_list,
+                        color: _hasActiveFilters()
+                            ? AppColors.accentBlue
+                            : AppColors.textSecondary,
+                      ),
+                      if (_hasActiveFilters())
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AppColors.accentBlue,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.cardBackground,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  tooltip: 'Фильтры',
                 ),
                 FloatingActionButton.small(
                   onPressed: () async {
