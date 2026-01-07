@@ -51,6 +51,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   bool _isLoadingDepartmentStats = false;
   List<DepartmentCompletionStats> _departmentStats = [];
   ProjectModel? _currentProject;
+  bool _showFilters = false; // Переключение между блоком информации и фильтрами
   
   // Ключи для независимых виджетов колонок
   final GlobalKey<_StagesColumnWidgetState> _stagesKey = GlobalKey<_StagesColumnWidgetState>();
@@ -474,8 +475,20 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
+  /// Проверка наличия активных фильтров в любой из колонок
+  bool _hasAnyActiveFilters() {
+    final stagesState = _stagesKey.currentState;
+    final sheetsState = _sheetsKey.currentState;
+    return (stagesState != null && stagesState.hasActiveFilters()) ||
+           (sheetsState != null && sheetsState.hasActiveFilters());
+  }
+
   /// Информация о проекте
   Widget _buildProjectInfo(bool isMobile) {
+    if (_showFilters) {
+      return _buildFiltersBlock(isMobile);
+    }
+
     return Container(
       padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: BoxDecoration(
@@ -496,13 +509,52 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 size: 24,
               ),
               const SizedBox(width: 12),
-              Text(
-                'Информация о проекте',
-                style: TextStyle(
-                  fontSize: isMobile ? 18 : 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              Expanded(
+                child: Text(
+                  'Информация о проекте',
+                  style: TextStyle(
+                    fontSize: isMobile ? 18 : 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
+              ),
+              IconButton(
+                onPressed: () {
+                  setState(() {
+                    _showFilters = true;
+                  });
+                },
+                icon: Stack(
+                  children: [
+                    Icon(
+                      Icons.filter_list,
+                      color: _hasAnyActiveFilters()
+                          ? AppColors.accentBlue
+                          : AppColors.textSecondary,
+                    ),
+                    if (_hasAnyActiveFilters())
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: AppColors.accentBlue,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.cardBackground,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                tooltip: 'Фильтры',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
           ),
@@ -539,6 +591,801 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Блок фильтров
+  Widget _buildFiltersBlock(bool isMobile) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.filter_list,
+                color: AppColors.accentBlue,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Фильтры',
+                  style: TextStyle(
+                    fontSize: isMobile ? 18 : 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _showFilters = false;
+                  });
+                },
+                icon: const Icon(
+                  Icons.info_outline,
+                  size: 18,
+                ),
+                label: const Text('Инфо'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accentBlue,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (isMobile) ...[
+            // На мобильных: вертикальная раскладка
+            _buildStagesFiltersPanel(),
+            const SizedBox(height: 20),
+            _buildSheetsFiltersPanel(),
+          ] else ...[
+            // На десктопе: горизонтальная раскладка
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildStagesFiltersPanel()),
+                const SizedBox(width: 16),
+                Expanded(child: _buildSheetsFiltersPanel()),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Панель фильтров этапов
+  Widget _buildStagesFiltersPanel() {
+    final stagesState = _stagesKey.currentState;
+    if (stagesState == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundSecondary.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.borderColor.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.timeline,
+                color: AppColors.accentBlue,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Фильтры этапов',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    stagesState.resetFilters();
+                  });
+                },
+                child: const Text(
+                  'Сбросить',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          StatefulBuilder(
+            builder: (context, setDialogState) {
+              return _buildStagesFiltersContent(stagesState, setDialogState);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Контент фильтров этапов
+  Widget _buildStagesFiltersContent(_StagesColumnWidgetState stagesState, StateSetter setDialogState) {
+    final filtersState = stagesState.getFiltersState();
+    final selectedUserIds = filtersState['selectedResponsibleUserIds'] as Set<int>?;
+    final selectedStatusIds = filtersState['selectedStatusIds'] as Set<int>?;
+    final dateFrom = filtersState['dateFrom'] as DateTime?;
+    final dateTo = filtersState['dateTo'] as DateTime?;
+    final hasFileFilter = filtersState['hasFileFilter'] as bool? ?? false;
+
+    final availableUsers = stagesState._getAvailableUsers();
+    final allStages = stagesState.getAllStages();
+
+    // Получаем уникальные статусы из загруженных этапов
+    final statusesMap = <int, StatusModel>{};
+    for (final stage in allStages) {
+      if (stage.status != null) {
+        statusesMap[stage.status!.id] = stage.status!;
+      }
+    }
+    final availableStatuses = statusesMap.values.toList()..sort((a, b) => a.name.compareTo(b.name));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Ответственные
+        if (availableUsers.isNotEmpty) ...[
+          const Text(
+            'Ответственные:',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: availableUsers.map((user) {
+              final isSelected = selectedUserIds?.contains(user.id) ?? false;
+              final userColor = user.department?.color ?? '#808080';
+              final deptColor = _parseColor(userColor);
+              return InkWell(
+                onTap: () {
+                  setDialogState(() {
+                    final newSet = Set<int>.from(selectedUserIds ?? {});
+                    if (isSelected) {
+                      newSet.remove(user.id);
+                    } else {
+                      newSet.add(user.id);
+                    }
+                    stagesState.setFiltersState(selectedResponsibleUserIds: newSet);
+                  });
+                  setState(() {}); // Обновляем родительский виджет
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: isSelected
+                      ? BoxDecoration(
+                          color: deptColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: deptColor,
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: deptColor.withOpacity(0.8),
+                              blurRadius: 4,
+                              spreadRadius: 0,
+                            ),
+                            BoxShadow(
+                              color: deptColor.withOpacity(0.6),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                            BoxShadow(
+                              color: deptColor.withOpacity(0.4),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
+                            BoxShadow(
+                              color: deptColor.withOpacity(0.3),
+                              blurRadius: 16,
+                              spreadRadius: 3,
+                            ),
+                          ],
+                        )
+                      : BoxDecoration(
+                          color: deptColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: deptColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                  child: Text(
+                    user.firstName != null && user.lastName != null
+                        ? '${user.firstName} ${user.lastName}'
+                        : user.username,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+        ],
+        // Статусы
+        if (availableStatuses.isNotEmpty) ...[
+          const Text(
+            'Статусы:',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: availableStatuses.map((status) {
+              final isSelected = selectedStatusIds?.contains(status.id) ?? false;
+              final statusColor = _parseColor(status.color);
+              return InkWell(
+                onTap: () {
+                  setDialogState(() {
+                    final newSet = Set<int>.from(selectedStatusIds ?? {});
+                    if (isSelected) {
+                      newSet.remove(status.id);
+                    } else {
+                      newSet.add(status.id);
+                    }
+                    stagesState.setFiltersState(selectedStatusIds: newSet);
+                  });
+                  setState(() {}); // Обновляем родительский виджет
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: isSelected
+                      ? BoxDecoration(
+                          color: statusColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: statusColor,
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: statusColor.withOpacity(0.8),
+                              blurRadius: 4,
+                              spreadRadius: 0,
+                            ),
+                            BoxShadow(
+                              color: statusColor.withOpacity(0.6),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                            BoxShadow(
+                              color: statusColor.withOpacity(0.4),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
+                            BoxShadow(
+                              color: statusColor.withOpacity(0.3),
+                              blurRadius: 16,
+                              spreadRadius: 3,
+                            ),
+                          ],
+                        )
+                      : BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: statusColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                  child: Text(
+                    status.name,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+        ],
+        // Период
+        const Text(
+          'Период:',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: dateFrom ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                    builder: (context, child) {
+                      return Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: const ColorScheme.dark(
+                            primary: AppColors.accentBlue,
+                            onPrimary: Colors.white,
+                            surface: AppColors.cardBackground,
+                            onSurface: AppColors.textPrimary,
+                          ),
+                        ),
+                        child: child!,
+                      );
+                    },
+                  );
+                  if (picked != null) {
+                    setDialogState(() {
+                      stagesState.setFiltersState(dateFrom: picked);
+                    });
+                    setState(() {}); // Обновляем родительский виджет
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSecondary,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.borderColor.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          dateFrom != null
+                              ? '${dateFrom.day.toString().padLeft(2, '0')}.${dateFrom.month.toString().padLeft(2, '0')}.${dateFrom.year}'
+                              : 'От',
+                          style: TextStyle(
+                            color: dateFrom != null
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: dateTo ?? DateTime.now(),
+                    firstDate: dateFrom ?? DateTime(2000),
+                    lastDate: DateTime(2100),
+                    builder: (context, child) {
+                      return Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: const ColorScheme.dark(
+                            primary: AppColors.accentBlue,
+                            onPrimary: Colors.white,
+                            surface: AppColors.cardBackground,
+                            onSurface: AppColors.textPrimary,
+                          ),
+                        ),
+                        child: child!,
+                      );
+                    },
+                  );
+                  if (picked != null) {
+                    setDialogState(() {
+                      stagesState.setFiltersState(dateTo: picked);
+                    });
+                    setState(() {}); // Обновляем родительский виджет
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSecondary,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.borderColor.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          dateTo != null
+                              ? '${dateTo.day.toString().padLeft(2, '0')}.${dateTo.month.toString().padLeft(2, '0')}.${dateTo.year}'
+                              : 'До',
+                          style: TextStyle(
+                            color: dateTo != null
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // С файлом
+        Row(
+          children: [
+            Checkbox(
+              value: hasFileFilter,
+              onChanged: (value) {
+                setDialogState(() {
+                  stagesState.setFiltersState(hasFileFilter: value ?? false);
+                });
+                setState(() {}); // Обновляем родительский виджет
+              },
+              activeColor: AppColors.accentBlue,
+            ),
+            const Expanded(
+              child: Text(
+                'Только с файлом',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Панель фильтров листов
+  Widget _buildSheetsFiltersPanel() {
+    final sheetsState = _sheetsKey.currentState;
+    if (sheetsState == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundSecondary.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.borderColor.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.description,
+                color: AppColors.accentGreen,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Фильтры листов',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    sheetsState.resetFilters();
+                  });
+                },
+                child: const Text(
+                  'Сбросить',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          StatefulBuilder(
+            builder: (context, setDialogState) {
+              return _buildSheetsFiltersContent(sheetsState, setDialogState);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Контент фильтров листов
+  Widget _buildSheetsFiltersContent(_SheetsColumnWidgetState sheetsState, StateSetter setDialogState) {
+    final filtersState = sheetsState.getFiltersState();
+    final selectedDepartmentIds = filtersState['selectedDepartmentIds'] as Set<int>?;
+    final completionFilter = filtersState['completionFilter'] as String?;
+
+    // Используем отделы из загруженных листов
+    final allSheets = sheetsState.getAllSheets();
+    final departmentsMap = <int, DepartmentModel>{};
+    for (final sheet in allSheets) {
+      if (sheet.responsibleDepartment != null) {
+        departmentsMap[sheet.responsibleDepartment!.id] = sheet.responsibleDepartment!;
+      }
+    }
+    final availableDepartments = departmentsMap.values.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // По отделам
+        if (availableDepartments.isNotEmpty) ...[
+          const Text(
+            'По отделам:',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: availableDepartments.map((dept) {
+              final isSelected = selectedDepartmentIds?.contains(dept.id) ?? false;
+              final deptColor = _parseColor(dept.color);
+              return InkWell(
+                onTap: () {
+                  setDialogState(() {
+                    final newSet = Set<int>.from(selectedDepartmentIds ?? {});
+                    if (isSelected) {
+                      newSet.remove(dept.id);
+                    } else {
+                      newSet.add(dept.id);
+                    }
+                    sheetsState.setFiltersState(selectedDepartmentIds: newSet);
+                  });
+                  setState(() {}); // Обновляем родительский виджет
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: isSelected
+                      ? BoxDecoration(
+                          color: deptColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: deptColor,
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: deptColor.withOpacity(0.8),
+                              blurRadius: 4,
+                              spreadRadius: 0,
+                            ),
+                            BoxShadow(
+                              color: deptColor.withOpacity(0.6),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                            BoxShadow(
+                              color: deptColor.withOpacity(0.4),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
+                            BoxShadow(
+                              color: deptColor.withOpacity(0.3),
+                              blurRadius: 16,
+                              spreadRadius: 3,
+                            ),
+                          ],
+                        )
+                      : BoxDecoration(
+                          color: deptColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: deptColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                  child: Text(
+                    dept.name,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+        ],
+        // По выполнению
+        const Text(
+          'По выполнению:',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            _buildCompletionFilterChip(
+              label: 'Все',
+              value: 'all',
+              selectedValue: completionFilter ?? 'all',
+              color: AppColors.textSecondary,
+              onTap: () {
+                setDialogState(() {
+                  sheetsState.setFiltersState(completionFilter: 'all');
+                });
+                setState(() {}); // Обновляем родительский виджет
+              },
+            ),
+            _buildCompletionFilterChip(
+              label: 'Выполнено',
+              value: 'completed',
+              selectedValue: completionFilter ?? 'all',
+              color: AppColors.accentGreen,
+              onTap: () {
+                setDialogState(() {
+                  sheetsState.setFiltersState(completionFilter: 'completed');
+                });
+                setState(() {}); // Обновляем родительский виджет
+              },
+            ),
+            _buildCompletionFilterChip(
+              label: 'Не выполнено',
+              value: 'incomplete',
+              selectedValue: completionFilter ?? 'all',
+              color: AppColors.accentBlue,
+              onTap: () {
+                setDialogState(() {
+                  sheetsState.setFiltersState(completionFilter: 'incomplete');
+                });
+                setState(() {}); // Обновляем родительский виджет
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Создание чипа для фильтра выполнения
+  Widget _buildCompletionFilterChip({
+    required String label,
+    required String value,
+    required String? selectedValue,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final isSelected = selectedValue == value;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: isSelected
+            ? BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: color,
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.8),
+                    blurRadius: 4,
+                    spreadRadius: 0,
+                  ),
+                  BoxShadow(
+                    color: color.withOpacity(0.6),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                  BoxShadow(
+                    color: color.withOpacity(0.4),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 16,
+                    spreadRadius: 3,
+                  ),
+                ],
+              )
+            : BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: color.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
@@ -1031,10 +1878,21 @@ class _StagesColumnWidget extends StatefulWidget {
 
 class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
   List<ProjectStageModel> _stages = [];
+  List<ProjectStageModel> _allStages = []; // Все загруженные этапы без фильтрации
+  
+  /// Получение всех загруженных этапов (публичный метод для доступа из родителя)
+  List<ProjectStageModel> getAllStages() => _allStages;
   bool _isLoading = false;
   int _currentPage = 1;
   int _totalPages = 1;
   int _totalCount = 0;
+  
+  // Состояние фильтров
+  Set<int>? _selectedResponsibleUserIds;
+  Set<int>? _selectedStatusIds;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+  bool _hasFileFilter = false;
 
   @override
   void initState() {
@@ -1062,10 +1920,12 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
           _isLoading = false;
           final data = result['data'];
           if (data is List) {
-            _stages = data
+            _allStages = data
                 .map((s) => ProjectStageModel.fromJson(s as Map<String, dynamic>))
                 .toList();
+            _stages = _applyFilters(_allStages.isNotEmpty ? _allStages : []);
           } else {
+            _allStages = [];
             _stages = [];
           }
 
@@ -1077,7 +1937,7 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
           } else {
             _currentPage = 1;
             _totalPages = 1;
-            _totalCount = _stages.length;
+            _totalCount = _allStages.length;
           }
         });
       }
@@ -1085,6 +1945,7 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _allStages = [];
           _stages = [];
           _currentPage = 1;
           _totalPages = 1;
@@ -1097,6 +1958,607 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
   void refresh() {
     _currentPage = 1;
     _loadStages();
+  }
+
+  /// Проверка наличия активных фильтров (публичный метод для доступа из родителя)
+  bool hasActiveFilters() {
+    return (_selectedResponsibleUserIds != null && _selectedResponsibleUserIds!.isNotEmpty) ||
+           (_selectedStatusIds != null && _selectedStatusIds!.isNotEmpty) ||
+           _dateFrom != null ||
+           _dateTo != null ||
+           _hasFileFilter;
+  }
+  
+  /// Получение состояния фильтров (для доступа из родителя)
+  Map<String, dynamic> getFiltersState() {
+    return {
+      'selectedResponsibleUserIds': _selectedResponsibleUserIds,
+      'selectedStatusIds': _selectedStatusIds,
+      'dateFrom': _dateFrom,
+      'dateTo': _dateTo,
+      'hasFileFilter': _hasFileFilter,
+    };
+  }
+  
+  /// Установка состояния фильтров (для доступа из родителя)
+  void setFiltersState({
+    Set<int>? selectedResponsibleUserIds,
+    Set<int>? selectedStatusIds,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? hasFileFilter,
+  }) {
+    setState(() {
+      if (selectedResponsibleUserIds != null) {
+        _selectedResponsibleUserIds = selectedResponsibleUserIds.isEmpty ? null : selectedResponsibleUserIds;
+      }
+      if (selectedStatusIds != null) {
+        _selectedStatusIds = selectedStatusIds.isEmpty ? null : selectedStatusIds;
+      }
+      if (dateFrom != null) _dateFrom = dateFrom;
+      if (dateTo != null) _dateTo = dateTo;
+      if (hasFileFilter != null) _hasFileFilter = hasFileFilter;
+      _updateFilters();
+    });
+  }
+  
+  /// Сброс всех фильтров
+  void resetFilters() {
+    setState(() {
+      _selectedResponsibleUserIds = null;
+      _selectedStatusIds = null;
+      _dateFrom = null;
+      _dateTo = null;
+      _hasFileFilter = false;
+      _updateFilters();
+    });
+  }
+
+  /// Получение списка уникальных ответственных из загруженных этапов (публичный метод)
+  List<UserModel> _getAvailableUsers() {
+    final usersMap = <int, UserModel>{};
+    for (final stage in _allStages) {
+      if (stage.responsibleUsers != null) {
+        for (final user in stage.responsibleUsers!) {
+          usersMap[user.id] = user;
+        }
+      }
+    }
+    return usersMap.values.toList()..sort((a, b) => a.username.compareTo(b.username));
+  }
+
+  /// Применение фильтров к списку этапов
+  List<ProjectStageModel> _applyFilters(List<ProjectStageModel> stages) {
+    if (stages.isEmpty || stages.length == 0) return [];
+    try {
+      return stages.where((stage) {
+        // Фильтр по ответственным
+        if (_selectedResponsibleUserIds != null && _selectedResponsibleUserIds!.isNotEmpty) {
+          final stageUserIds = stage.responsibleUserIds ?? [];
+          if (!stageUserIds.any((id) => _selectedResponsibleUserIds!.contains(id))) {
+            return false;
+          }
+        }
+        // Фильтр по статусам
+        if (_selectedStatusIds != null && _selectedStatusIds!.isNotEmpty) {
+          final stageStatusId = stage.status?.id ?? stage.statusId;
+          if (stageStatusId == null || !_selectedStatusIds!.contains(stageStatusId)) {
+            return false;
+          }
+        }
+        // Фильтр по периоду
+        if (_dateFrom != null && stage.datetime.isBefore(_dateFrom!)) return false;
+        if (_dateTo != null) {
+          final dateToEnd = _dateTo!.add(const Duration(days: 1));
+          if (stage.datetime.isAfter(dateToEnd)) return false;
+        }
+        // Фильтр по файлу
+        if (_hasFileFilter && (stage.fileUrl == null || stage.fileUrl!.isEmpty)) return false;
+        return true;
+      }).toList();
+    } catch (e) {
+      // В случае ошибки возвращаем пустой список
+      return [];
+    }
+  }
+
+  /// Обновление фильтров и применение их к списку
+  void _updateFilters() {
+    setState(() {
+      _stages = _applyFilters(_allStages.isNotEmpty ? _allStages : []);
+    });
+  }
+
+  /// Преобразование HEX цвета в Color
+  Color _parseColor(String hexColor) {
+    try {
+      if (hexColor.isEmpty) {
+        return AppColors.textSecondary;
+      }
+      String hex = hexColor.trim().replaceAll('#', '').toUpperCase();
+      if (hex.length == 6) {
+        return Color(int.parse('FF$hex', radix: 16));
+      } else if (hex.length == 8) {
+        return Color(int.parse(hex, radix: 16));
+      } else if (hex.length == 3) {
+        final r = hex[0];
+        final g = hex[1];
+        final b = hex[2];
+        hex = '$r$r$g$g$b$b';
+        return Color(int.parse('FF$hex', radix: 16));
+      }
+    } catch (e) {
+      // Если не удалось распарсить, возвращаем цвет по умолчанию
+    }
+    return AppColors.textSecondary;
+  }
+
+  /// Показ модального окна фильтров
+  Future<void> _showFilterDialog() async {
+    List<UserModel> availableUsers = _getAvailableUsers();
+    List<StatusModel> allStatuses = [];
+    bool isLoadingStatuses = true;
+
+    // Загружаем все статусы типа 'stage'
+    final statusResult = await ApiService.getStatuses(statusType: 'stage');
+    if (statusResult['success'] == true) {
+      final data = statusResult['data'] as List;
+      allStatuses = data
+          .map((s) => StatusModel.fromJson(s as Map<String, dynamic>))
+          .toList();
+      isLoadingStatuses = false;
+    }
+
+    Set<int> tempSelectedUserIds = _selectedResponsibleUserIds != null
+        ? Set<int>.from(_selectedResponsibleUserIds!)
+        : <int>{};
+    Set<int> tempSelectedStatusIds = _selectedStatusIds != null
+        ? Set<int>.from(_selectedStatusIds!)
+        : <int>{};
+    DateTime? tempDateFrom = _dateFrom;
+    DateTime? tempDateTo = _dateTo;
+    bool tempHasFileFilter = _hasFileFilter;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: AppColors.cardBackground,
+            title: const Text(
+              'Фильтры',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: SizedBox(
+              width: 450,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Фильтр по ответственным
+                    const Text(
+                      'Ответственные:',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (availableUsers.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Text(
+                          'Нет ответственных',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: availableUsers.map((user) {
+                          final isSelected = tempSelectedUserIds.contains(user.id);
+                          final userColor = user.department?.color ?? '#808080';
+                          final deptColor = _parseColor(userColor);
+                          return InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                if (isSelected) {
+                                  tempSelectedUserIds.remove(user.id);
+                                } else {
+                                  tempSelectedUserIds.add(user.id);
+                                }
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: isSelected
+                                  ? BoxDecoration(
+                                      color: deptColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: deptColor,
+                                        width: 2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: deptColor.withOpacity(0.8),
+                                          blurRadius: 4,
+                                          spreadRadius: 0,
+                                        ),
+                                        BoxShadow(
+                                          color: deptColor.withOpacity(0.6),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                        ),
+                                        BoxShadow(
+                                          color: deptColor.withOpacity(0.4),
+                                          blurRadius: 12,
+                                          spreadRadius: 2,
+                                        ),
+                                        BoxShadow(
+                                          color: deptColor.withOpacity(0.3),
+                                          blurRadius: 16,
+                                          spreadRadius: 3,
+                                        ),
+                                      ],
+                                    )
+                                  : BoxDecoration(
+                                      color: deptColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: deptColor.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                              child: Text(
+                                user.firstName != null && user.lastName != null
+                                    ? '${user.firstName} ${user.lastName}'
+                                    : user.username,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 20),
+                    // Фильтр по статусам
+                    const Text(
+                      'Статусы:',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (isLoadingStatuses)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (allStatuses.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Text(
+                          'Нет статусов',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: allStatuses.map((status) {
+                          final isSelected = tempSelectedStatusIds.contains(status.id);
+                          final statusColor = _parseColor(status.color);
+                          return InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                if (isSelected) {
+                                  tempSelectedStatusIds.remove(status.id);
+                                } else {
+                                  tempSelectedStatusIds.add(status.id);
+                                }
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: isSelected
+                                  ? BoxDecoration(
+                                      color: statusColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: statusColor,
+                                        width: 2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: statusColor.withOpacity(0.8),
+                                          blurRadius: 4,
+                                          spreadRadius: 0,
+                                        ),
+                                        BoxShadow(
+                                          color: statusColor.withOpacity(0.6),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                        ),
+                                        BoxShadow(
+                                          color: statusColor.withOpacity(0.4),
+                                          blurRadius: 12,
+                                          spreadRadius: 2,
+                                        ),
+                                        BoxShadow(
+                                          color: statusColor.withOpacity(0.3),
+                                          blurRadius: 16,
+                                          spreadRadius: 3,
+                                        ),
+                                      ],
+                                    )
+                                  : BoxDecoration(
+                                      color: statusColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: statusColor.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                              child: Text(
+                                status.name,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 20),
+                    // Фильтр по периоду
+                    const Text(
+                      'Период:',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: tempDateFrom ?? DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2100),
+                                builder: (context, child) {
+                                  return Theme(
+                                    data: Theme.of(context).copyWith(
+                                      colorScheme: const ColorScheme.dark(
+                                        primary: AppColors.accentBlue,
+                                        onPrimary: Colors.white,
+                                        surface: AppColors.cardBackground,
+                                        onSurface: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    child: child!,
+                                  );
+                                },
+                              );
+                              if (picked != null) {
+                                setDialogState(() {
+                                  tempDateFrom = picked;
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundSecondary,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppColors.borderColor.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_today,
+                                    size: 16,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      tempDateFrom != null
+                                          ? '${tempDateFrom!.day.toString().padLeft(2, '0')}.${tempDateFrom!.month.toString().padLeft(2, '0')}.${tempDateFrom!.year}'
+                                          : 'От',
+                                      style: TextStyle(
+                                        color: tempDateFrom != null
+                                            ? AppColors.textPrimary
+                                            : AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: tempDateTo ?? DateTime.now(),
+                                firstDate: tempDateFrom ?? DateTime(2000),
+                                lastDate: DateTime(2100),
+                                builder: (context, child) {
+                                  return Theme(
+                                    data: Theme.of(context).copyWith(
+                                      colorScheme: const ColorScheme.dark(
+                                        primary: AppColors.accentBlue,
+                                        onPrimary: Colors.white,
+                                        surface: AppColors.cardBackground,
+                                        onSurface: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    child: child!,
+                                  );
+                                },
+                              );
+                              if (picked != null) {
+                                setDialogState(() {
+                                  tempDateTo = picked;
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundSecondary,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppColors.borderColor.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_today,
+                                    size: 16,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      tempDateTo != null
+                                          ? '${tempDateTo!.day.toString().padLeft(2, '0')}.${tempDateTo!.month.toString().padLeft(2, '0')}.${tempDateTo!.year}'
+                                          : 'До',
+                                      style: TextStyle(
+                                        color: tempDateTo != null
+                                            ? AppColors.textPrimary
+                                            : AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // Фильтр по файлу
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: tempHasFileFilter,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              tempHasFileFilter = value ?? false;
+                            });
+                          },
+                          activeColor: AppColors.accentBlue,
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'Только с файлом',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  setDialogState(() {
+                    tempSelectedUserIds.clear();
+                    tempSelectedStatusIds.clear();
+                    tempDateFrom = null;
+                    tempDateTo = null;
+                    tempHasFileFilter = false;
+                  });
+                },
+                child: const Text(
+                  'Сбросить',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Отмена',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedResponsibleUserIds = tempSelectedUserIds.isEmpty
+                        ? null
+                        : Set<int>.from(tempSelectedUserIds);
+                    _selectedStatusIds = tempSelectedStatusIds.isEmpty
+                        ? null
+                        : Set<int>.from(tempSelectedStatusIds);
+                    _dateFrom = tempDateFrom;
+                    _dateTo = tempDateTo;
+                    _hasFileFilter = tempHasFileFilter;
+                    _updateFilters();
+                  });
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentBlue,
+                ),
+                child: const Text(
+                  'Применить',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -1131,6 +2593,37 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
                       color: AppColors.textPrimary,
                     ),
                   ),
+                ),
+                IconButton(
+                  onPressed: _showFilterDialog,
+                  icon: Stack(
+                    children: [
+                      Icon(
+                        Icons.filter_list,
+                        color: hasActiveFilters()
+                            ? AppColors.accentBlue
+                            : AppColors.textSecondary,
+                      ),
+                      if (hasActiveFilters())
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AppColors.accentBlue,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.cardBackground,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  tooltip: 'Фильтры',
                 ),
                 FloatingActionButton.small(
                   onPressed: () async {
@@ -1383,14 +2876,6 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
       ),
     );
   }
-
-  Color _parseColor(String hexColor) {
-    try {
-      return Color(int.parse(hexColor.replaceAll('#', '0xFF')));
-    } catch (e) {
-      return AppColors.textSecondary;
-    }
-  }
 }
 
 /// Виджет колонки листов с независимым состоянием
@@ -1417,6 +2902,9 @@ class _SheetsColumnWidget extends StatefulWidget {
 class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
   List<ProjectSheetModel> _sheets = [];
   List<ProjectSheetModel> _allSheets = []; // Все загруженные листы без фильтрации
+  
+  /// Получение всех загруженных листов (публичный метод для доступа из родителя)
+  List<ProjectSheetModel> getAllSheets() => _allSheets;
   bool _isLoading = false;
   int _currentPage = 1;
   int _totalPages = 1;
@@ -1492,10 +2980,43 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
     _loadSheets();
   }
 
-  /// Проверка наличия активных фильтров
-  bool _hasActiveFilters() {
+  /// Проверка наличия активных фильтров (публичный метод для доступа из родителя)
+  bool hasActiveFilters() {
     return (_selectedDepartmentIds != null && _selectedDepartmentIds!.isNotEmpty) ||
            (_completionFilter != null && _completionFilter != 'all');
+  }
+  
+  /// Получение состояния фильтров (для доступа из родителя)
+  Map<String, dynamic> getFiltersState() {
+    return {
+      'selectedDepartmentIds': _selectedDepartmentIds,
+      'completionFilter': _completionFilter,
+    };
+  }
+  
+  /// Установка состояния фильтров (для доступа из родителя)
+  void setFiltersState({
+    Set<int>? selectedDepartmentIds,
+    String? completionFilter,
+  }) {
+    setState(() {
+      if (selectedDepartmentIds != null) {
+        _selectedDepartmentIds = selectedDepartmentIds.isEmpty ? null : selectedDepartmentIds;
+      }
+      if (completionFilter != null) {
+        _completionFilter = completionFilter == 'all' ? null : completionFilter;
+      }
+      _updateFilters();
+    });
+  }
+  
+  /// Сброс всех фильтров
+  void resetFilters() {
+    setState(() {
+      _selectedDepartmentIds = null;
+      _completionFilter = null;
+      _updateFilters();
+    });
   }
 
   /// Применение фильтров к списку листов
@@ -1537,6 +3058,71 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
     });
   }
 
+  /// Создание чипа для фильтра выполнения
+  Widget _buildCompletionFilterChip({
+    required String label,
+    required String value,
+    required String? selectedValue,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final isSelected = selectedValue == value;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: isSelected
+            ? BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: color,
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.8),
+                    blurRadius: 4,
+                    spreadRadius: 0,
+                  ),
+                  BoxShadow(
+                    color: color.withOpacity(0.6),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                  BoxShadow(
+                    color: color.withOpacity(0.4),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 16,
+                    spreadRadius: 3,
+                  ),
+                ],
+              )
+            : BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: color.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Показ модального окна фильтров
   Future<void> _showFilterDialog() async {
     List<DepartmentModel> departments = [];
@@ -1566,12 +3152,12 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
               'Фильтры',
               style: TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
             content: SizedBox(
-              width: double.maxFinite,
+              width: 400,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1582,11 +3168,11 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
                       'По отделам:',
                       style: TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     if (isLoadingDepartments)
                       const Center(
                         child: Padding(
@@ -1601,114 +3187,130 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
                           'Нет отделов',
                           style: TextStyle(
                             color: AppColors.textSecondary,
-                            fontSize: 14,
+                            fontSize: 12,
                           ),
                         ),
                       )
                     else
-                      ...departments.map((dept) {
-                        final isSelected = tempSelectedDepartmentIds.contains(dept.id);
-                        return CheckboxListTile(
-                          title: Row(
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: _parseColor(dept.color),
-                                  shape: BoxShape.circle,
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: departments.map((dept) {
+                          final isSelected = tempSelectedDepartmentIds.contains(dept.id);
+                          final deptColor = _parseColor(dept.color);
+                          return InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                if (isSelected) {
+                                  tempSelectedDepartmentIds.remove(dept.id);
+                                } else {
+                                  tempSelectedDepartmentIds.add(dept.id);
+                                }
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: isSelected
+                                  ? BoxDecoration(
+                                      color: deptColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: deptColor,
+                                        width: 2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: deptColor.withOpacity(0.8),
+                                          blurRadius: 4,
+                                          spreadRadius: 0,
+                                        ),
+                                        BoxShadow(
+                                          color: deptColor.withOpacity(0.6),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                        ),
+                                        BoxShadow(
+                                          color: deptColor.withOpacity(0.4),
+                                          blurRadius: 12,
+                                          spreadRadius: 2,
+                                        ),
+                                        BoxShadow(
+                                          color: deptColor.withOpacity(0.3),
+                                          blurRadius: 16,
+                                          spreadRadius: 3,
+                                        ),
+                                      ],
+                                    )
+                                  : BoxDecoration(
+                                      color: deptColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: deptColor.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                              child: Text(
+                                dept.name,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  dept.name,
-                                  style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          value: isSelected,
-                          onChanged: (value) {
-                            setDialogState(() {
-                              if (value == true) {
-                                tempSelectedDepartmentIds.add(dept.id);
-                              } else {
-                                tempSelectedDepartmentIds.remove(dept.id);
-                              }
-                            });
-                          },
-                          activeColor: AppColors.accentBlue,
-                          contentPadding: EdgeInsets.zero,
-                        );
-                      }),
-                    const SizedBox(height: 24),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 20),
                     // Фильтр по выполнению
                     const Text(
                       'По выполнению:',
                       style: TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    RadioListTile<String>(
-                      title: const Text(
-                        'Все',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildCompletionFilterChip(
+                          label: 'Все',
+                          value: 'all',
+                          selectedValue: tempCompletionFilter,
+                          color: AppColors.textSecondary,
+                          onTap: () {
+                            setDialogState(() {
+                              tempCompletionFilter = 'all';
+                            });
+                          },
                         ),
-                      ),
-                      value: 'all',
-                      groupValue: tempCompletionFilter,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          tempCompletionFilter = value;
-                        });
-                      },
-                      activeColor: AppColors.accentBlue,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    RadioListTile<String>(
-                      title: const Text(
-                        'Выполнено',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
+                        _buildCompletionFilterChip(
+                          label: 'Выполнено',
+                          value: 'completed',
+                          selectedValue: tempCompletionFilter,
+                          color: AppColors.accentGreen,
+                          onTap: () {
+                            setDialogState(() {
+                              tempCompletionFilter = 'completed';
+                            });
+                          },
                         ),
-                      ),
-                      value: 'completed',
-                      groupValue: tempCompletionFilter,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          tempCompletionFilter = value;
-                        });
-                      },
-                      activeColor: AppColors.accentBlue,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    RadioListTile<String>(
-                      title: const Text(
-                        'Не выполнено',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
+                        _buildCompletionFilterChip(
+                          label: 'Не выполнено',
+                          value: 'incomplete',
+                          selectedValue: tempCompletionFilter,
+                          color: AppColors.accentBlue,
+                          onTap: () {
+                            setDialogState(() {
+                              tempCompletionFilter = 'incomplete';
+                            });
+                          },
                         ),
-                      ),
-                      value: 'incomplete',
-                      groupValue: tempCompletionFilter,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          tempCompletionFilter = value;
-                        });
-                      },
-                      activeColor: AppColors.accentBlue,
-                      contentPadding: EdgeInsets.zero,
+                      ],
                     ),
                   ],
                 ),
@@ -1804,11 +3406,11 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
                     children: [
                       Icon(
                         Icons.filter_list,
-                        color: _hasActiveFilters()
+                        color: hasActiveFilters()
                             ? AppColors.accentBlue
                             : AppColors.textSecondary,
                       ),
-                      if (_hasActiveFilters())
+                      if (hasActiveFilters())
                         Positioned(
                           right: 0,
                           top: 0,
@@ -2112,3 +3714,4 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
     }
   }
 }
+
