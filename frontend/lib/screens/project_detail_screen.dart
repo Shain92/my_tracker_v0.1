@@ -7,6 +7,7 @@ import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../widgets/project_stage_form_dialog.dart';
 import '../widgets/project_sheet_form_dialog.dart';
+import '../utils/web_utils.dart';
 
 /// Статистика выполнения по отделу
 class DepartmentCompletionStats {
@@ -2706,13 +2707,28 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '${stage.datetime.day.toString().padLeft(2, '0')}.${stage.datetime.month.toString().padLeft(2, '0')}.${stage.datetime.year} ${stage.datetime.hour.toString().padLeft(2, '0')}:${stage.datetime.minute.toString().padLeft(2, '0')}',
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${stage.datetime.day.toString().padLeft(2, '0')}.${stage.datetime.month.toString().padLeft(2, '0')}.${stage.datetime.year} ${stage.datetime.hour.toString().padLeft(2, '0')}:${stage.datetime.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  if (stage.fileUrl != null && stage.fileUrl!.isNotEmpty)
+                    GestureDetector(
+                      onTap: () => _downloadFile(stage.id, 'stage'),
+                      child: Icon(
+                        Icons.download,
+                        size: 20,
+                        color: AppColors.accentBlue,
+                      ),
+                    ),
+                ],
               ),
               if (stage.status != null) ...[
                 const SizedBox(height: 8),
@@ -2803,6 +2819,80 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
         ),
       ),
     );
+  }
+
+  /// Скачивание файла этапа или проектного листа
+  Future<void> _downloadFile(int id, String type) async {
+    try {
+      Map<String, dynamic> result;
+      if (type == 'stage') {
+        result = await ApiService.downloadProjectStageFile(id);
+      } else {
+        result = await ApiService.downloadProjectSheetFile(id);
+      }
+
+      if (result['success'] == true) {
+        final bytes = result['data'] as List<int>;
+        final headers = result['headers'] as Map<String, String>;
+
+        // Извлекаем имя файла из заголовка Content-Disposition
+        String filename = 'file_$id.pdf';
+        final contentDisposition = headers['content-disposition'] ?? '';
+        if (contentDisposition.isNotEmpty) {
+          // Ищем имя файла в заголовке
+          final filenameIndex = contentDisposition.indexOf('filename=');
+          if (filenameIndex != -1) {
+            var startIndex = filenameIndex + 9; // длина "filename="
+            if (startIndex < contentDisposition.length) {
+              var endIndex = contentDisposition.indexOf(';', startIndex);
+              if (endIndex == -1) {
+                endIndex = contentDisposition.length;
+              }
+              var extractedFilename = contentDisposition.substring(startIndex, endIndex).trim();
+              // Убираем кавычки если есть
+              if (extractedFilename.startsWith('"') && extractedFilename.endsWith('"')) {
+                extractedFilename = extractedFilename.substring(1, extractedFilename.length - 1);
+              } else if (extractedFilename.startsWith("'") && extractedFilename.endsWith("'")) {
+                extractedFilename = extractedFilename.substring(1, extractedFilename.length - 1);
+              }
+              if (extractedFilename.isNotEmpty) {
+                filename = extractedFilename;
+              }
+            }
+          }
+        }
+
+        // Скачиваем файл
+        downloadFileFromBytes(bytes, filename);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Файл "$filename" успешно скачан'),
+              backgroundColor: AppColors.accentGreen,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Ошибка скачивания файла'),
+              backgroundColor: AppColors.accentPink,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: ${e.toString()}'),
+            backgroundColor: AppColors.accentPink,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildPaginationControls() {
@@ -3392,7 +3482,7 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'Проектные листы',
+                    'Листы ИД',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -3486,6 +3576,75 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
         ],
       ),
     );
+  }
+
+  /// Скачивание файла проектного листа
+  Future<void> _downloadFile(int id) async {
+    try {
+      final result = await ApiService.downloadProjectSheetFile(id);
+
+      if (result['success'] == true) {
+        final bytes = result['data'] as List<int>;
+        final headers = result['headers'] as Map<String, String>;
+
+        // Извлекаем имя файла из заголовка Content-Disposition
+        String filename = 'file_$id.pdf';
+        final contentDisposition = headers['content-disposition'] ?? '';
+        if (contentDisposition.isNotEmpty) {
+          // Ищем имя файла в заголовке
+          final filenameIndex = contentDisposition.indexOf('filename=');
+          if (filenameIndex != -1) {
+            var startIndex = filenameIndex + 9; // длина "filename="
+            if (startIndex < contentDisposition.length) {
+              var endIndex = contentDisposition.indexOf(';', startIndex);
+              if (endIndex == -1) {
+                endIndex = contentDisposition.length;
+              }
+              var extractedFilename = contentDisposition.substring(startIndex, endIndex).trim();
+              // Убираем кавычки если есть
+              if (extractedFilename.startsWith('"') && extractedFilename.endsWith('"')) {
+                extractedFilename = extractedFilename.substring(1, extractedFilename.length - 1);
+              } else if (extractedFilename.startsWith("'") && extractedFilename.endsWith("'")) {
+                extractedFilename = extractedFilename.substring(1, extractedFilename.length - 1);
+              }
+              if (extractedFilename.isNotEmpty) {
+                filename = extractedFilename;
+              }
+            }
+          }
+        }
+
+        // Скачиваем файл
+        downloadFileFromBytes(bytes, filename);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Файл "$filename" успешно скачан'),
+              backgroundColor: AppColors.accentGreen,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Ошибка скачивания файла'),
+              backgroundColor: AppColors.accentPink,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: ${e.toString()}'),
+            backgroundColor: AppColors.accentPink,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildSheetCard(ProjectSheetModel sheet) {
@@ -3625,6 +3784,15 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
                       ],
                     ),
                   ),
+                  if (sheet.fileUrl != null && sheet.fileUrl!.isNotEmpty)
+                    GestureDetector(
+                      onTap: () => _downloadFile(sheet.id),
+                      child: Icon(
+                        Icons.download,
+                        size: 20,
+                        color: AppColors.accentBlue,
+                      ),
+                    ),
                 ],
               ),
             ],

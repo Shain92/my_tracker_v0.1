@@ -329,7 +329,10 @@ class _ProjectSheetFormDialogState extends State<ProjectSheetFormDialog> {
     if (_selectedDepartment != null) {
       data['responsible_department_id'] = _selectedDepartment!.id.toString();
     }
-    data['is_completed'] = _isCompleted.toString();
+    // Отправляем is_completed только если пользователь может его изменить или значение изменилось
+    if (widget.sheet == null || _canToggleCompleted() || _isCompleted != widget.sheet!.isCompleted) {
+      data['is_completed'] = _isCompleted.toString();
+    }
 
     Map<String, dynamic> result;
     if (widget.sheet == null) {
