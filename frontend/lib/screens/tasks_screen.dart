@@ -651,12 +651,32 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
   
   List<ConstructionSiteModel> _constructionSites = [];
   List<ProjectModel> _projects = [];
+  
+  // Отдел текущего пользователя
+  int? _currentUserDepartmentId;
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUserDepartment();
     _loadData();
     _loadConstructionSites();
+  }
+  
+  /// Загрузка отдела текущего пользователя
+  Future<void> _loadCurrentUserDepartment() async {
+    final user = await ApiService.getCurrentUser();
+    if (mounted && user != null) {
+      setState(() {
+        if (user['department_id'] != null) {
+          _currentUserDepartmentId = user['department_id'] as int;
+        } else {
+          _currentUserDepartmentId = null;
+        }
+      });
+      // Перезагружаем данные после получения отдела
+      _loadData();
+    }
   }
 
   /// Загрузка строительных участков
@@ -727,6 +747,7 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
           isCompleted: _completionFilter == 'all'
               ? null
               : _completionFilter == 'completed',
+          departmentId: _currentUserDepartmentId,
           page: page,
           pageSize: 100,
         );

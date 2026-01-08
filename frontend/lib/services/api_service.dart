@@ -1758,6 +1758,7 @@ class ApiService {
     int projectId, {
     int page = 1,
     int pageSize = 5,
+    int? departmentId,
   }) async {
     try {
       var token = await getAccessToken();
@@ -1770,6 +1771,10 @@ class ApiService {
         'page': page.toString(),
         'page_size': pageSize.toString(),
       };
+      
+      if (departmentId != null) {
+        queryParams['department_id'] = departmentId.toString();
+      }
 
       final uri = Uri.parse('$baseUrl/projects/project-sheets/').replace(
         queryParameters: queryParams,
@@ -2410,6 +2415,7 @@ class ApiService {
     int? constructionSiteId,
     int? projectId,
     bool? isCompleted,
+    int? departmentId,
     int page = 1,
     int pageSize = 100,
   }) async {
@@ -2432,6 +2438,9 @@ class ApiService {
       }
       if (isCompleted != null) {
         queryParams['is_completed'] = isCompleted.toString();
+      }
+      if (departmentId != null) {
+        queryParams['department_id'] = departmentId.toString();
       }
 
       final uri = Uri.parse('$baseUrl/projects/project-sheets/').replace(
