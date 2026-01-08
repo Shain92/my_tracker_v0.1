@@ -914,9 +914,19 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
     );
   }
 
-  /// Построение иерархического списка
+  /// Построение списка карточек листов
   Widget _buildHierarchyList() {
-    if (_hierarchy.isEmpty) {
+    // Собираем все листы в плоский список
+    List<ProjectSheetModel> allSheets = [];
+    for (final siteNode in _hierarchy.values) {
+      for (final projectNode in siteNode.projects.values) {
+        for (final sheetNode in projectNode.sheets) {
+          allSheets.add(sheetNode.sheet);
+        }
+      }
+    }
+
+    if (allSheets.isEmpty) {
       return Center(
         child: Text(
           'Нет листов',
@@ -928,199 +938,120 @@ class _SheetsColumnWidgetState extends State<_SheetsColumnWidget> {
     }
 
     return ListView.builder(
-      itemCount: _hierarchy.length,
+      itemCount: allSheets.length,
       itemBuilder: (context, index) {
-        final siteNode = _hierarchy.values.elementAt(index);
-        return _buildSiteNode(siteNode);
+        final sheet = allSheets[index];
+        return _buildSheetCard(sheet);
       },
     );
   }
 
-  /// Построение узла строительного участка
-  Widget _buildSiteNode(_ConstructionSiteNodeForSheets siteNode) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: () {
-            setState(() {
-              siteNode.isExpanded = !siteNode.isExpanded;
-            });
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              children: [
-                Icon(
-                  siteNode.isExpanded
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_right,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  siteNode.site.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (siteNode.isExpanded)
-          Padding(
-            padding: const EdgeInsets.only(left: 24.0),
-            child: Column(
-              children: siteNode.projects.values.map((projectNode) {
-                return _buildProjectNode(projectNode);
-              }).toList(),
-            ),
-          ),
-      ],
-    );
-  }
-
-  /// Построение узла проекта
-  Widget _buildProjectNode(_ProjectNodeForSheets projectNode) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: () {
-            setState(() {
-              projectNode.isExpanded = !projectNode.isExpanded;
-            });
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              children: [
-                Icon(
-                  projectNode.isExpanded
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_right,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProjectDetailScreen(
-                            project: projectNode.project,
-                          ),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      projectNode.project.name,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppColors.accentBlue,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (projectNode.isExpanded)
-          Padding(
-            padding: const EdgeInsets.only(left: 24.0),
-            child: Column(
-              children: projectNode.sheets.map((sheetNode) {
-                return _buildSheetItem(sheetNode.sheet);
-              }).toList(),
-            ),
-          ),
-      ],
-    );
-  }
-
-  /// Построение элемента листа
-  Widget _buildSheetItem(ProjectSheetModel sheet) {
+  /// Построение карточки листа
+  Widget _buildSheetCard(ProjectSheetModel sheet) {
     final description = sheet.description ?? '';
     final shortDescription = description.length > 100
         ? '${description.substring(0, 100)}...'
         : description;
+    
+    final project = sheet.project;
+    final site = project?.constructionSite;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+      padding: const EdgeInsets.only(bottom: 12.0),
       child: Card(
-        color: AppColors.cardBackground.withOpacity(0.3),
+        color: AppColors.cardBackground.withOpacity(0.6),
         child: InkWell(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ProjectDetailScreen(
-                  project: sheet.project ?? ProjectModel(
-                    id: sheet.projectId,
-                    name: '',
-                    code: '',
-                    cipher: '',
+            if (project != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProjectDetailScreen(
+                    project: project,
                   ),
                 ),
-              ),
-            );
+              );
+            }
           },
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Строительный участок
+                if (site != null) ...[
+                  Text(
+                    site.name,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                // Проект
+                if (project != null) ...[
+                  Text(
+                    project.name,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppColors.accentBlue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                // Название листа
                 Row(
                   children: [
                     Expanded(
                       child: Text(
                         sheet.name ?? 'Без названия',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppColors.accentBlue,
-                          decoration: TextDecoration.underline,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                     if (sheet.isCompleted)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
                           color: AppColors.accentGreen.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           'Выполнено',
                           style: TextStyle(
                             color: AppColors.accentGreen,
                             fontSize: 12,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
                   ],
                 ),
+                // Описание
                 if (shortDescription.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Text(
                     shortDescription,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
+                // Статус
                 if (sheet.status != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: _parseColor(sheet.status!.color).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       sheet.status!.name,
                       style: TextStyle(
                         color: _parseColor(sheet.status!.color),
-                        fontSize: 12,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
