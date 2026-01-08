@@ -203,10 +203,14 @@ class ProjectSheetViewSet(viewsets.ModelViewSet):
         """Фильтрация по проекту, отделу и сортировка"""
         queryset = super().get_queryset()
         
-        # Фильтр по отделу (только при явном указании)
+        # Фильтр по отделу
         department_id = self.request.query_params.get('department_id')
         if department_id:
             queryset = queryset.filter(responsible_department_id=department_id)
+        # Автоматическая фильтрация по отделу пользователя только для страницы "Задачи"
+        elif self.request.query_params.get('filter_by_user_department') == 'true':
+            if hasattr(self.request.user, 'profile') and self.request.user.profile.department:
+                queryset = queryset.filter(responsible_department_id=self.request.user.profile.department.id)
         
         # Фильтр по проекту
         project_id = self.request.query_params.get('project_id')

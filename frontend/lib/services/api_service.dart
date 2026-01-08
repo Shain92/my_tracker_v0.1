@@ -2441,6 +2441,9 @@ class ApiService {
       }
       if (departmentId != null) {
         queryParams['department_id'] = departmentId.toString();
+      } else {
+        // Если departmentId не указан, используем автоматическую фильтрацию по отделу пользователя
+        queryParams['filter_by_user_department'] = 'true';
       }
 
       final uri = Uri.parse('$baseUrl/projects/project-sheets/').replace(
@@ -2474,17 +2477,51 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         
-        List<dynamic> results = [];
+        // Обработка ответа с пагинацией
         if (data is Map<String, dynamic> && data.containsKey('results')) {
-          results = data['results'] as List? ?? [];
+          final count = data['count'] as int? ?? 0;
+          final results = data['results'] as List? ?? [];
+          final next = data['next'] as String?;
+          final previous = data['previous'] as String?;
+          final totalPages = count > 0 ? (count / pageSize).ceil() : 1;
+          
+          return {
+            'success': true,
+            'data': results,
+            'pagination': {
+              'count': count,
+              'currentPage': page,
+              'totalPages': totalPages,
+              'hasNext': next != null,
+              'hasPrevious': previous != null,
+            },
+          };
         } else if (data is List) {
-          results = data;
+          // Обратная совместимость: если ответ - список без пагинации
+          return {
+            'success': true,
+            'data': data,
+            'pagination': {
+              'count': data.length,
+              'currentPage': 1,
+              'totalPages': 1,
+              'hasNext': false,
+              'hasPrevious': false,
+            },
+          };
+        } else {
+          return {
+            'success': true,
+            'data': [],
+            'pagination': {
+              'count': 0,
+              'currentPage': 1,
+              'totalPages': 1,
+              'hasNext': false,
+              'hasPrevious': false,
+            },
+          };
         }
-        
-        return {
-          'success': true,
-          'data': results,
-        };
       } else {
         final error = jsonDecode(response.body);
         return {'success': false, 'error': error['error'] ?? 'Ошибка получения листов отдела'};
