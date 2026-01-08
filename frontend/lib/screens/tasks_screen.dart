@@ -28,6 +28,11 @@ class _TasksScreenState extends State<TasksScreen> {
   // Сортировка
   String? _sortColumn;
   bool _sortAscending = true;
+  
+  // Фильтрация
+  Map<String, String> _columnFilters = {};
+  Set<String> _activeFilterColumns = {};
+  String? _completedFilter = 'not_completed'; // null, 'completed', 'not_completed'
 
   @override
   void initState() {
@@ -121,6 +126,59 @@ class _TasksScreenState extends State<TasksScreen> {
       
       return _sortAscending ? comparison : -comparison;
     });
+  }
+  
+  /// Применение фильтров
+  List<ProjectSheetModel> _applyFilters() {
+    List<ProjectSheetModel> filtered = List.from(_sheets);
+    
+    // Фильтр по "Выполнено"
+    if (_completedFilter != null) {
+      filtered = filtered.where((sheet) {
+        if (_completedFilter == 'completed') {
+          return sheet.isCompleted;
+        } else if (_completedFilter == 'not_completed') {
+          return !sheet.isCompleted;
+        }
+        return true;
+      }).toList();
+    }
+    
+    // Фильтры по текстовым столбцам
+    for (final entry in _columnFilters.entries) {
+      final column = entry.key;
+      final filterText = entry.value.trim().toLowerCase();
+      
+      if (filterText.isEmpty) continue;
+      
+      filtered = filtered.where((sheet) {
+        String text = '';
+        
+        switch (column) {
+          case 'name':
+            text = (sheet.name ?? '').toLowerCase();
+            break;
+          case 'project':
+            text = (sheet.project?.name ?? '').toLowerCase();
+            break;
+          case 'constructionSite':
+            text = (sheet.project?.constructionSite?.name ?? '').toLowerCase();
+            break;
+          case 'status':
+            text = (sheet.status?.name ?? '').toLowerCase();
+            break;
+          case 'createdAt':
+            text = sheet.createdAt != null
+                ? _formatDate(sheet.createdAt!).toLowerCase()
+                : '';
+            break;
+        }
+        
+        return text.contains(filterText);
+      }).toList();
+    }
+    
+    return filtered;
   }
 
   /// Обработка сортировки
@@ -306,6 +364,8 @@ class _TasksScreenState extends State<TasksScreen> {
 
   /// Построение таблицы
   Widget _buildTable() {
+    final filteredSheets = _applyFilters();
+    
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -316,42 +376,147 @@ class _TasksScreenState extends State<TasksScreen> {
           width: 1,
         ),
       ),
-      child: DataTable(
-        headingRowColor: WidgetStateProperty.all(
-          AppColors.cardBackground.withOpacity(0.8),
-        ),
-        dataRowColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return AppColors.accentBlue.withOpacity(0.2);
-          }
-          return null;
-        }),
-        columns: [
-          _buildDataColumn('Выполнено', 'isCompleted'),
-          _buildDataColumn('Название', 'name'),
-          _buildDataColumn('Проект', 'project'),
-          _buildDataColumn('Участок', 'constructionSite'),
-          _buildDataColumn('Статус', 'status'),
-          _buildDataColumn('Дата создания', 'createdAt'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DataTable(
+            headingRowColor: WidgetStateProperty.all(
+              AppColors.cardBackground.withOpacity(0.8),
+            ),
+            dataRowColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return AppColors.accentBlue.withOpacity(0.2);
+              }
+              return null;
+            }),
+            columns: [
+              _buildDataColumn('Выполнено', 'isCompleted'),
+              _buildDataColumn('Название', 'name'),
+              _buildDataColumn('Проект', 'project'),
+              _buildDataColumn('Участок', 'constructionSite'),
+              _buildDataColumn('Статус', 'status'),
+              _buildDataColumn('Дата создания', 'createdAt'),
+            ],
+            rows: filteredSheets.map((sheet) => _buildDataRow(sheet)).toList(),
+          ),
+          if (_activeFilterColumns.isNotEmpty) _buildFilterRow(),
         ],
-        rows: _sheets.map((sheet) => _buildDataRow(sheet)).toList(),
+      ),
+    );
+  }
+  
+  /// Строка с поисковыми полями
+  Widget _buildFilterRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.4),
+        border: Border(
+          top: BorderSide(
+            color: AppColors.borderColor.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Table(
+        columnWidths: const {
+          0: FlexColumnWidth(1),
+          1: FlexColumnWidth(2),
+          2: FlexColumnWidth(2),
+          3: FlexColumnWidth(2),
+          4: FlexColumnWidth(2),
+          5: FlexColumnWidth(2),
+        },
+        children: [
+          TableRow(
+            children: [
+              _buildSearchField('isCompleted'),
+              _buildSearchField('name'),
+              _buildSearchField('project'),
+              _buildSearchField('constructionSite'),
+              _buildSearchField('status'),
+              _buildSearchField('createdAt'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Поисковое поле для столбца
+  Widget _buildSearchField(String column) {
+    if (column == 'isCompleted') {
+      return const SizedBox.shrink();
+    }
+    
+    if (!_activeFilterColumns.contains(column)) {
+      return const SizedBox.shrink();
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: TextField(
+        key: ValueKey('search_$column'),
+        controller: TextEditingController(text: _columnFilters[column] ?? ''),
+        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+        decoration: InputDecoration(
+          hintText: 'Поиск...',
+          hintStyle: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: BorderSide(color: AppColors.borderColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: BorderSide(color: AppColors.borderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: BorderSide(color: AppColors.accentBlue),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          isDense: true,
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            onPressed: () {
+              setState(() {
+                _activeFilterColumns.remove(column);
+                _columnFilters.remove(column);
+              });
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ),
+        onChanged: (value) {
+          setState(() {
+            _columnFilters[column] = value;
+          });
+        },
       ),
     );
   }
 
   /// Построение колонки с сортировкой
   DataColumn _buildDataColumn(String label, String column) {
+    final hasFilter = _columnFilters[column]?.isNotEmpty ?? false;
+    
     return DataColumn(
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.bold,
+          if (column == 'isCompleted') ...[
+            _buildCompletedDropdown(),
+          ] else ...[
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
+          ],
           if (_sortColumn == column) ...[
             const SizedBox(width: 4),
             Icon(
@@ -360,9 +525,57 @@ class _TasksScreenState extends State<TasksScreen> {
               color: AppColors.accentBlue,
             ),
           ],
+          if (column != 'isCompleted') ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (_activeFilterColumns.contains(column)) {
+                    _activeFilterColumns.remove(column);
+                    _columnFilters.remove(column);
+                  } else {
+                    _activeFilterColumns.add(column);
+                    _columnFilters[column] = '';
+                  }
+                });
+              },
+              child: Icon(
+                Icons.search,
+                size: 16,
+                color: hasFilter || _activeFilterColumns.contains(column)
+                    ? AppColors.accentBlue
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ],
         ],
       ),
       onSort: (columnIndex, ascending) => _onSort(column),
+    );
+  }
+  
+  /// Выпадающий список для фильтра "Выполнено"
+  Widget _buildCompletedDropdown() {
+    return DropdownButton<String>(
+      value: _completedFilter,
+      isDense: true,
+      underline: const SizedBox.shrink(),
+      icon: const Icon(Icons.arrow_drop_down, size: 16),
+      items: const [
+        DropdownMenuItem(value: null, child: Text('Все', style: TextStyle(fontSize: 12))),
+        DropdownMenuItem(value: 'completed', child: Text('Выполнено', style: TextStyle(fontSize: 12))),
+        DropdownMenuItem(value: 'not_completed', child: Text('Не выполнено', style: TextStyle(fontSize: 12))),
+      ],
+      onChanged: (value) {
+        setState(() {
+          _completedFilter = value;
+        });
+      },
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+      ),
     );
   }
 
