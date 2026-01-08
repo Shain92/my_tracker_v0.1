@@ -1510,7 +1510,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             ),
             const SizedBox(width: 8),
             const Text(
-              'Невыполненные листы по отделам: ',
+              'Невыполненные разделы (по отделам): ',
               style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 14,
@@ -2587,7 +2587,7 @@ class _StagesColumnWidgetState extends State<_StagesColumnWidget> {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'Этапы проекта',
+                    'Этапы подготовки ИД',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
