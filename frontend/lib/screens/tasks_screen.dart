@@ -15,25 +15,49 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
+  // Выбранный чип
+  String _selectedTab = 'sheets'; // 'sheets' или 'stages'
+  
+  // Данные для листов (ИД)
   List<ProjectSheetModel> _sheets = [];
   bool _isLoading = true;
   String? _errorMessage;
   
-  // Пагинация
+  // Данные для этапов
+  List<ProjectStageModel> _stages = [];
+  bool _isLoadingStages = false;
+  String? _errorMessageStages;
+  
+  // Пагинация для листов
   int _currentPage = 1;
   int _totalPages = 1;
   int _totalCount = 0;
+  
+  // Пагинация для этапов
+  int _currentPageStages = 1;
+  int _totalPagesStages = 1;
+  int _totalCountStages = 0;
+  
   static const int _pageSize = 20;
   
-  // Сортировка
+  // Сортировка для листов
   String? _sortColumn;
   bool _sortAscending = true;
   
-  // Фильтрация
+  // Сортировка для этапов
+  String? _sortColumnStages;
+  bool _sortAscendingStages = true;
+  
+  // Фильтрация для листов
   Map<String, String> _columnFilters = {};
   Set<String> _activeFilterColumns = {};
   String? _completedFilter = 'not_completed'; // null, 'completed', 'not_completed'
   Map<String, TextEditingController> _searchControllers = {};
+  
+  // Фильтрация для этапов
+  Map<String, String> _columnFiltersStages = {};
+  Set<String> _activeFilterColumnsStages = {};
+  Map<String, TextEditingController> _searchControllersStages = {};
 
   @override
   void initState() {
@@ -43,11 +67,18 @@ class _TasksScreenState extends State<TasksScreen> {
   
   @override
   void dispose() {
-    // Освобождаем все контроллеры поиска
+    // Освобождаем все контроллеры поиска для листов
     for (final controller in _searchControllers.values) {
       controller.dispose();
     }
     _searchControllers.clear();
+    
+    // Освобождаем все контроллеры поиска для этапов
+    for (final controller in _searchControllersStages.values) {
+      controller.dispose();
+    }
+    _searchControllersStages.clear();
+    
     super.dispose();
   }
 
@@ -218,6 +249,158 @@ class _TasksScreenState extends State<TasksScreen> {
     }
   }
 
+  /// Загрузка этапов
+  Future<void> _loadStages({int? page}) async {
+    setState(() {
+      _isLoadingStages = true;
+      _errorMessageStages = null;
+    });
+
+    try {
+      final currentPage = page ?? _currentPageStages;
+      final result = await ApiService.getUserResponsibleStages(
+        page: currentPage,
+        pageSize: _pageSize,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoadingStages = false;
+          if (result['success'] == true) {
+            final data = result['data'] as List;
+            _stages = data
+                .map((json) => ProjectStageModel.fromJson(json as Map<String, dynamic>))
+                .toList();
+            
+            // Обновление информации о пагинации
+            if (result['pagination'] != null) {
+              final pagination = result['pagination'] as Map<String, dynamic>;
+              _currentPageStages = pagination['currentPage'] as int? ?? 1;
+              _totalPagesStages = pagination['totalPages'] as int? ?? 1;
+              _totalCountStages = pagination['count'] as int? ?? 0;
+            } else {
+              _currentPageStages = 1;
+              _totalPagesStages = 1;
+              _totalCountStages = _stages.length;
+            }
+            
+            // Применение сортировки
+            _applySortingStages();
+          } else {
+            _errorMessageStages = result['error'] ?? 'Ошибка загрузки этапов';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingStages = false;
+          _errorMessageStages = 'Ошибка подключения: ${e.toString()}';
+        });
+      }
+    }
+  }
+
+  /// Применение сортировки для этапов
+  void _applySortingStages() {
+    if (_sortColumnStages == null) return;
+    
+    _stages.sort((a, b) {
+      int comparison = 0;
+      
+      switch (_sortColumnStages) {
+        case 'status':
+          comparison = (a.status?.name ?? '').compareTo(b.status?.name ?? '');
+          break;
+        case 'description':
+          comparison = (a.description ?? '').compareTo(b.description ?? '');
+          break;
+        case 'project':
+          comparison = (a.project?.name ?? '').compareTo(b.project?.name ?? '');
+          break;
+        case 'constructionSite':
+          final aSite = a.project?.constructionSite?.name ?? '';
+          final bSite = b.project?.constructionSite?.name ?? '';
+          comparison = aSite.compareTo(bSite);
+          break;
+        case 'createdAt':
+          final aDate = a.createdAt ?? '';
+          final bDate = b.createdAt ?? '';
+          comparison = aDate.compareTo(bDate);
+          break;
+      }
+      
+      return _sortAscendingStages ? comparison : -comparison;
+    });
+  }
+  
+  /// Применение фильтров для этапов
+  List<ProjectStageModel> _applyFiltersStages() {
+    List<ProjectStageModel> filtered = List.from(_stages);
+    
+    // Фильтры по текстовым столбцам
+    for (final entry in _columnFiltersStages.entries) {
+      final column = entry.key;
+      final filterText = entry.value.trim().toLowerCase();
+      
+      if (filterText.isEmpty) continue;
+      
+      filtered = filtered.where((stage) {
+        String text = '';
+        
+        switch (column) {
+          case 'status':
+            text = (stage.status?.name ?? '').toLowerCase();
+            break;
+          case 'description':
+            text = (stage.description ?? '').toLowerCase();
+            break;
+          case 'project':
+            text = (stage.project?.name ?? '').toLowerCase();
+            break;
+          case 'constructionSite':
+            text = (stage.project?.constructionSite?.name ?? '').toLowerCase();
+            break;
+          case 'createdAt':
+            text = stage.createdAt != null
+                ? _formatDate(stage.createdAt!).toLowerCase()
+                : '';
+            break;
+        }
+        
+        return text.contains(filterText);
+      }).toList();
+    }
+    
+    return filtered;
+  }
+
+  /// Обработка сортировки для этапов
+  void _onSortStages(String column) {
+    setState(() {
+      if (_sortColumnStages == column) {
+        _sortAscendingStages = !_sortAscendingStages;
+      } else {
+        _sortColumnStages = column;
+        _sortAscendingStages = true;
+      }
+      _applySortingStages();
+    });
+  }
+
+  /// Обновление списка этапов
+  Future<void> _refreshStages() async {
+    _currentPageStages = 1;
+    await _loadStages(page: 1);
+  }
+  
+  /// Переход на страницу для этапов
+  void _goToPageStages(int page) {
+    if (page >= 1 && page <= _totalPagesStages && page != _currentPageStages) {
+      _loadStages(page: page);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -258,45 +441,111 @@ class _TasksScreenState extends State<TasksScreen> {
           bottomRight: Radius.circular(20),
         ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.accentOrange.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.task_alt,
-              color: AppColors.accentOrange,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Задачи',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.accentOrange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.task_alt,
+                  color: AppColors.accentOrange,
+                  size: 24,
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Задачи',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                color: AppColors.textPrimary,
+                onPressed: _selectedTab == 'sheets' ? _refreshSheets : _refreshStages,
+                tooltip: 'Обновить',
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            color: AppColors.textPrimary,
-            onPressed: _refreshSheets,
-            tooltip: 'Обновить',
-          ),
+          const SizedBox(height: 12),
+          _buildChips(),
         ],
+      ),
+    );
+  }
+
+  /// Чипы для переключения между таблицами
+  Widget _buildChips() {
+    return Row(
+      children: [
+        _buildChip('ИД', 'sheets'),
+        const SizedBox(width: 8),
+        _buildChip('Этапы', 'stages'),
+      ],
+    );
+  }
+
+  /// Отдельный чип
+  Widget _buildChip(String label, String value) {
+    final isSelected = _selectedTab == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedTab = value;
+          if (value == 'stages' && _stages.isEmpty && !_isLoadingStages) {
+            _loadStages();
+          }
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.accentBlue.withOpacity(0.2)
+              : AppColors.cardBackground.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.accentBlue
+                : AppColors.borderColor.withOpacity(0.5),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected
+                ? AppColors.accentBlue
+                : AppColors.textSecondary,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 14,
+          ),
+        ),
       ),
     );
   }
 
   /// Контент
   Widget _buildContent() {
+    if (_selectedTab == 'sheets') {
+      return _buildSheetsContent();
+    } else {
+      return _buildStagesContent();
+    }
+  }
+
+  /// Контент для листов
+  Widget _buildSheetsContent() {
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(),
@@ -368,6 +617,84 @@ class _TasksScreenState extends State<TasksScreen> {
             ),
           ),
           _buildPaginationControls(),
+        ],
+      ),
+    );
+  }
+
+  /// Контент для этапов
+  Widget _buildStagesContent() {
+    if (_isLoadingStages) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_errorMessageStages != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: AppColors.accentPink,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessageStages!,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _refreshStages,
+              child: const Text('Повторить'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_stages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.timeline_outlined,
+              size: 64,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Нет этапов',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshStages,
+      child: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SingleChildScrollView(
+                child: _buildStagesTable(),
+              ),
+            ),
+          ),
+          _buildPaginationControlsStages(),
         ],
       ),
     );
@@ -680,6 +1007,289 @@ class _TasksScreenState extends State<TasksScreen> {
                   : TextDecoration.combine(decorations),
           decorationColor: AppColors.accentBlue,
         ),
+      ),
+    );
+  }
+
+  /// Построение таблицы этапов
+  Widget _buildStagesTable() {
+    final filteredStages = _applyFiltersStages();
+    
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.borderColor,
+          width: 1,
+        ),
+      ),
+      child: DataTable(
+        headingRowColor: WidgetStateProperty.all(
+          AppColors.cardBackground.withOpacity(0.8),
+        ),
+        dataRowColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.accentBlue.withOpacity(0.2);
+          }
+          return null;
+        }),
+        columns: [
+          _buildDataColumnStages('Статус', 'status'),
+          _buildDataColumnStages('Описание', 'description'),
+          _buildDataColumnStages('Проект', 'project'),
+          _buildDataColumnStages('Участок', 'constructionSite'),
+          _buildDataColumnStages('Дата создания', 'createdAt'),
+        ],
+        rows: filteredStages.map((stage) => _buildDataRowStages(stage)).toList(),
+      ),
+    );
+  }
+  
+  /// Построение колонки с сортировкой для этапов
+  DataColumn _buildDataColumnStages(String label, String column) {
+    final hasFilter = _columnFiltersStages[column]?.isNotEmpty ?? false;
+    final isSearchActive = _activeFilterColumnsStages.contains(column);
+    
+    return DataColumn(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isSearchActive) ...[
+            SizedBox(
+              width: 120,
+              child: _buildSearchFieldInHeaderStages(column),
+            ),
+          ] else ...[
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _activeFilterColumnsStages.add(column);
+                  _columnFiltersStages[column] = '';
+                });
+              },
+              child: Icon(
+                Icons.search,
+                size: 16,
+                color: hasFilter
+                    ? AppColors.accentBlue
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ],
+          if (_sortColumnStages == column && !isSearchActive) ...[
+            const SizedBox(width: 4),
+            Icon(
+              _sortAscendingStages ? Icons.arrow_upward : Icons.arrow_downward,
+              size: 16,
+              color: AppColors.accentBlue,
+            ),
+          ],
+        ],
+      ),
+      onSort: (columnIndex, ascending) => _onSortStages(column),
+    );
+  }
+  
+  /// Поисковое поле в заголовке столбца для этапов
+  Widget _buildSearchFieldInHeaderStages(String column) {
+    // Создаём контроллер для этого столбца, если его ещё нет
+    if (!_searchControllersStages.containsKey(column)) {
+      _searchControllersStages[column] = TextEditingController(text: _columnFiltersStages[column] ?? '');
+    }
+    
+    return TextField(
+      key: ValueKey('search_header_stages_$column'),
+      controller: _searchControllersStages[column],
+      style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        hintText: 'Поиск...',
+        hintStyle: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: AppColors.borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: AppColors.borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: AppColors.accentBlue),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        isDense: true,
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.close, size: 16),
+          onPressed: () {
+            setState(() {
+              _activeFilterColumnsStages.remove(column);
+              _columnFiltersStages.remove(column);
+              _searchControllersStages[column]?.dispose();
+              _searchControllersStages.remove(column);
+            });
+          },
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+        ),
+      ),
+      onChanged: (value) {
+        setState(() {
+          _columnFiltersStages[column] = value;
+        });
+      },
+    );
+  }
+
+  /// Построение строки таблицы этапов
+  DataRow _buildDataRowStages(ProjectStageModel stage) {
+    return DataRow(
+      cells: [
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (stage.status != null) ...[
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: _parseColor(stage.status!.color),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  stage.status!.name,
+                  style: TextStyle(
+                    color: _parseColor(stage.status!.color),
+                  ),
+                ),
+              ] else
+                const Text(
+                  '—',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+            ],
+          ),
+        ),
+        DataCell(
+          Text(
+            stage.description ?? '—',
+            style: const TextStyle(color: AppColors.textPrimary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        DataCell(
+          _buildClickableText(
+            stage.project?.name ?? '—',
+            null,
+            () {
+              if (stage.project != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProjectDetailScreen(project: stage.project!),
+                  ),
+                );
+              }
+            },
+          ),
+        ),
+        DataCell(
+          _buildClickableText(
+            stage.project?.constructionSite?.name ?? '—',
+            null,
+            () {
+              if (stage.project?.constructionSite != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SiteProjectsScreen(
+                      constructionSite: stage.project!.constructionSite!,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+        ),
+        DataCell(
+          Text(
+            stage.createdAt != null
+                ? _formatDate(stage.createdAt!)
+                : '—',
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Построение элементов управления пагинацией для этапов
+  Widget _buildPaginationControlsStages() {
+    if (_totalPagesStages <= 1) {
+      return const SizedBox.shrink();
+    }
+
+    final startItem = ((_currentPageStages - 1) * _pageSize) + 1;
+    final endItem = (_currentPageStages * _pageSize).clamp(0, _totalCountStages);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground.withOpacity(0.3),
+        border: Border(
+          top: BorderSide(
+            color: AppColors.borderColor.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Показано $startItem-$endItem из $_totalCountStages',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                color: _currentPageStages > 1 ? AppColors.textPrimary : AppColors.textTertiary,
+                onPressed: _currentPageStages > 1 ? () => _goToPageStages(_currentPageStages - 1) : null,
+                tooltip: 'Предыдущая',
+              ),
+              Text(
+                '$_currentPageStages / $_totalPagesStages',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                color: _currentPageStages < _totalPagesStages ? AppColors.textPrimary : AppColors.textTertiary,
+                onPressed: _currentPageStages < _totalPagesStages ? () => _goToPageStages(_currentPageStages + 1) : null,
+                tooltip: 'Следующая',
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

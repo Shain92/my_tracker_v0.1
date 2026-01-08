@@ -2530,5 +2530,106 @@ class ApiService {
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
     }
   }
+
+  /// Получение этапов проектов, где пользователь является ответственным
+  static Future<Map<String, dynamic>> getUserResponsibleStages({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      var token = await getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'error': 'Не авторизован'};
+      }
+
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'page_size': pageSize.toString(),
+      };
+
+      final uri = Uri.parse('$baseUrl/projects/project-stages/').replace(
+        queryParameters: queryParams,
+      );
+
+      var response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          token = await getAccessToken();
+          if (token != null) {
+            response = await http.get(
+              uri,
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            );
+          }
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        // Обработка ответа с пагинацией
+        if (data is Map<String, dynamic> && data.containsKey('results')) {
+          final count = data['count'] as int? ?? 0;
+          final results = data['results'] as List? ?? [];
+          final next = data['next'] as String?;
+          final previous = data['previous'] as String?;
+          final totalPages = count > 0 ? (count / pageSize).ceil() : 1;
+          
+          return {
+            'success': true,
+            'data': results,
+            'pagination': {
+              'count': count,
+              'currentPage': page,
+              'totalPages': totalPages,
+              'hasNext': next != null,
+              'hasPrevious': previous != null,
+            },
+          };
+        } else if (data is List) {
+          // Обратная совместимость: если ответ - список без пагинации
+          return {
+            'success': true,
+            'data': data,
+            'pagination': {
+              'count': data.length,
+              'currentPage': 1,
+              'totalPages': 1,
+              'hasNext': false,
+              'hasPrevious': false,
+            },
+          };
+        } else {
+          return {
+            'success': true,
+            'data': [],
+            'pagination': {
+              'count': 0,
+              'currentPage': 1,
+              'totalPages': 1,
+              'hasNext': false,
+              'hasPrevious': false,
+            },
+          };
+        }
+      } else {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Ошибка получения этапов'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
 }
 
