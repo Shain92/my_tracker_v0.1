@@ -33,11 +33,22 @@ class _TasksScreenState extends State<TasksScreen> {
   Map<String, String> _columnFilters = {};
   Set<String> _activeFilterColumns = {};
   String? _completedFilter = 'not_completed'; // null, 'completed', 'not_completed'
+  Map<String, TextEditingController> _searchControllers = {};
 
   @override
   void initState() {
     super.initState();
     _loadSheets();
+  }
+  
+  @override
+  void dispose() {
+    // Освобождаем все контроллеры поиска
+    for (final controller in _searchControllers.values) {
+      controller.dispose();
+    }
+    _searchControllers.clear();
+    super.dispose();
   }
 
   /// Загрузка листов отдела
@@ -376,131 +387,33 @@ class _TasksScreenState extends State<TasksScreen> {
           width: 1,
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DataTable(
-            headingRowColor: WidgetStateProperty.all(
-              AppColors.cardBackground.withOpacity(0.8),
-            ),
-            dataRowColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return AppColors.accentBlue.withOpacity(0.2);
-              }
-              return null;
-            }),
-            columns: [
-              _buildDataColumn('Выполнено', 'isCompleted'),
-              _buildDataColumn('Название', 'name'),
-              _buildDataColumn('Проект', 'project'),
-              _buildDataColumn('Участок', 'constructionSite'),
-              _buildDataColumn('Статус', 'status'),
-              _buildDataColumn('Дата создания', 'createdAt'),
-            ],
-            rows: filteredSheets.map((sheet) => _buildDataRow(sheet)).toList(),
-          ),
-          if (_activeFilterColumns.isNotEmpty) _buildFilterRow(),
+      child: DataTable(
+        headingRowColor: WidgetStateProperty.all(
+          AppColors.cardBackground.withOpacity(0.8),
+        ),
+        dataRowColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.accentBlue.withOpacity(0.2);
+          }
+          return null;
+        }),
+        columns: [
+          _buildDataColumn('Выполнено', 'isCompleted'),
+          _buildDataColumn('Название', 'name'),
+          _buildDataColumn('Проект', 'project'),
+          _buildDataColumn('Участок', 'constructionSite'),
+          _buildDataColumn('Статус', 'status'),
+          _buildDataColumn('Дата создания', 'createdAt'),
         ],
+        rows: filteredSheets.map((sheet) => _buildDataRow(sheet)).toList(),
       ),
     );
   }
   
-  /// Строка с поисковыми полями
-  Widget _buildFilterRow() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground.withOpacity(0.4),
-        border: Border(
-          top: BorderSide(
-            color: AppColors.borderColor.withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-      ),
-      child: Table(
-        columnWidths: const {
-          0: FlexColumnWidth(1),
-          1: FlexColumnWidth(2),
-          2: FlexColumnWidth(2),
-          3: FlexColumnWidth(2),
-          4: FlexColumnWidth(2),
-          5: FlexColumnWidth(2),
-        },
-        children: [
-          TableRow(
-            children: [
-              _buildSearchField('isCompleted'),
-              _buildSearchField('name'),
-              _buildSearchField('project'),
-              _buildSearchField('constructionSite'),
-              _buildSearchField('status'),
-              _buildSearchField('createdAt'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-  
-  /// Поисковое поле для столбца
-  Widget _buildSearchField(String column) {
-    if (column == 'isCompleted') {
-      return const SizedBox.shrink();
-    }
-    
-    if (!_activeFilterColumns.contains(column)) {
-      return const SizedBox.shrink();
-    }
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: TextField(
-        key: ValueKey('search_$column'),
-        controller: TextEditingController(text: _columnFilters[column] ?? ''),
-        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
-        decoration: InputDecoration(
-          hintText: 'Поиск...',
-          hintStyle: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide(color: AppColors.borderColor),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide(color: AppColors.borderColor),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide(color: AppColors.accentBlue),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          isDense: true,
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.close, size: 16),
-            onPressed: () {
-              setState(() {
-                _activeFilterColumns.remove(column);
-                _columnFilters.remove(column);
-              });
-            },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-        ),
-        onChanged: (value) {
-          setState(() {
-            _columnFilters[column] = value;
-          });
-        },
-      ),
-    );
-  }
-
   /// Построение колонки с сортировкой
   DataColumn _buildDataColumn(String label, String column) {
     final hasFilter = _columnFilters[column]?.isNotEmpty ?? false;
+    final isSearchActive = _activeFilterColumns.contains(column);
     
     return DataColumn(
       label: Row(
@@ -508,6 +421,11 @@ class _TasksScreenState extends State<TasksScreen> {
         children: [
           if (column == 'isCompleted') ...[
             _buildCompletedDropdown(),
+          ] else if (isSearchActive) ...[
+            SizedBox(
+              width: 120,
+              child: _buildSearchFieldInHeader(column),
+            ),
           ] else ...[
             Text(
               label,
@@ -516,8 +434,24 @@ class _TasksScreenState extends State<TasksScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _activeFilterColumns.add(column);
+                  _columnFilters[column] = '';
+                });
+              },
+              child: Icon(
+                Icons.search,
+                size: 16,
+                color: hasFilter
+                    ? AppColors.accentBlue
+                    : AppColors.textSecondary,
+              ),
+            ),
           ],
-          if (_sortColumn == column) ...[
+          if (_sortColumn == column && !isSearchActive) ...[
             const SizedBox(width: 4),
             Icon(
               _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
@@ -525,32 +459,59 @@ class _TasksScreenState extends State<TasksScreen> {
               color: AppColors.accentBlue,
             ),
           ],
-          if (column != 'isCompleted') ...[
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (_activeFilterColumns.contains(column)) {
-                    _activeFilterColumns.remove(column);
-                    _columnFilters.remove(column);
-                  } else {
-                    _activeFilterColumns.add(column);
-                    _columnFilters[column] = '';
-                  }
-                });
-              },
-              child: Icon(
-                Icons.search,
-                size: 16,
-                color: hasFilter || _activeFilterColumns.contains(column)
-                    ? AppColors.accentBlue
-                    : AppColors.textSecondary,
-              ),
-            ),
-          ],
         ],
       ),
       onSort: (columnIndex, ascending) => _onSort(column),
+    );
+  }
+  
+  /// Поисковое поле в заголовке столбца
+  Widget _buildSearchFieldInHeader(String column) {
+    // Создаём контроллер для этого столбца, если его ещё нет
+    if (!_searchControllers.containsKey(column)) {
+      _searchControllers[column] = TextEditingController(text: _columnFilters[column] ?? '');
+    }
+    
+    return TextField(
+      key: ValueKey('search_header_$column'),
+      controller: _searchControllers[column],
+      style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        hintText: 'Поиск...',
+        hintStyle: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: AppColors.borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: AppColors.borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: AppColors.accentBlue),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        isDense: true,
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.close, size: 16),
+          onPressed: () {
+            setState(() {
+              _activeFilterColumns.remove(column);
+              _columnFilters.remove(column);
+              _searchControllers[column]?.dispose();
+              _searchControllers.remove(column);
+            });
+          },
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+        ),
+      ),
+      onChanged: (value) {
+        setState(() {
+          _columnFilters[column] = value;
+        });
+      },
     );
   }
   
