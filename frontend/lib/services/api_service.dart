@@ -32,6 +32,8 @@ class ApiService {
     try {
       final refreshToken = await getRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) {
+        // Если refresh token отсутствует, очищаем все токены
+        await logout();
         return false;
       }
       
@@ -45,9 +47,14 @@ class ApiService {
         final data = jsonDecode(response.body);
         await saveToken(data['access'], refreshToken);
         return true;
+      } else {
+        // Если refresh token истек или невалиден, очищаем все токены
+        await logout();
+        return false;
       }
-      return false;
     } catch (e) {
+      // При ошибке также очищаем токены
+      await logout();
       return false;
     }
   }
@@ -715,7 +722,7 @@ class ApiService {
     try {
       var token = await getAccessToken();
       if (token == null || token.isEmpty) {
-        return {'success': false, 'error': 'Не авторизован'};
+        return {'success': false, 'error': 'Не авторизован', 'requiresLogin': true};
       }
 
       var uri = Uri.parse('$baseUrl/projects/projects/');
@@ -743,7 +750,13 @@ class ApiService {
                 'Content-Type': 'application/json',
               },
             );
+          } else {
+            // Токен не получен после обновления - требуется перелогин
+            return {'success': false, 'error': 'Требуется авторизация', 'requiresLogin': true};
           }
+        } else {
+          // Не удалось обновить токен - требуется перелогин
+          return {'success': false, 'error': 'Требуется авторизация', 'requiresLogin': true};
         }
       }
 
@@ -760,8 +773,23 @@ class ApiService {
           return {'success': true, 'data': [data]};
         }
       } else {
-        final error = jsonDecode(response.body);
-        return {'success': false, 'error': error['error'] ?? 'Ошибка получения списка проектов'};
+        String errorMessage = 'Ошибка получения списка проектов';
+        try {
+          final error = jsonDecode(response.body);
+          if (error is Map<String, dynamic>) {
+            errorMessage = error['error'] ?? error['detail'] ?? error['message'] ?? errorMessage;
+          } else if (error is String) {
+            errorMessage = error;
+          }
+        } catch (e) {
+          // Если не удалось распарсить JSON, используем текст ответа
+          errorMessage = response.body.isNotEmpty 
+              ? response.body 
+              : 'Ошибка ${response.statusCode}: ${response.reasonPhrase ?? 'Неизвестная ошибка'}';
+        }
+        // Если снова 401 после обновления токена, требуется перелогин
+        final requiresLogin = response.statusCode == 401;
+        return {'success': false, 'error': errorMessage, 'requiresLogin': requiresLogin};
       }
     } catch (e) {
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
