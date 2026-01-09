@@ -83,11 +83,16 @@ class _TasksScreenState extends State<TasksScreen> {
   List<StatusModel> _stageStatuses = [];
   Set<int> _selectedStatusIds = {};
   bool _isLoadingStatuses = false;
+  
+  // Режим отображения созданных пользователем ИД
+  bool _showCreatedByMode = false;
+  int _createdBySheetsCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadSheets();
+    _loadCreatedBySheetsCount();
   }
   
   @override
@@ -125,6 +130,8 @@ class _TasksScreenState extends State<TasksScreen> {
       final result = await ApiService.getDepartmentSheets(
         page: currentPage,
         pageSize: _pageSize,
+        filterByCreatedBy: _showCreatedByMode ? true : null,
+        isCompleted: _showCreatedByMode ? false : null,
       );
 
       if (mounted) {
@@ -206,7 +213,9 @@ class _TasksScreenState extends State<TasksScreen> {
     List<ProjectSheetModel> filtered = List.from(_sheets);
     
     // Фильтр по "Выполнено"
-    if (_completedFilter != null) {
+    // В режиме created_by мы уже фильтруем по is_completed=false на сервере
+    // Но можем применить дополнительную фильтрацию, если нужно
+    if (_completedFilter != null && !_showCreatedByMode) {
       filtered = filtered.where((sheet) {
         if (_completedFilter == 'completed') {
           return sheet.isCompleted;
@@ -271,6 +280,35 @@ class _TasksScreenState extends State<TasksScreen> {
   Future<void> _refreshSheets() async {
     _currentPage = 1;
     await _loadSheets(page: 1);
+    if (_showCreatedByMode) {
+      await _loadCreatedBySheetsCount();
+    }
+  }
+  
+  /// Загрузка количества невыполненных ИД с файлами
+  Future<void> _loadCreatedBySheetsCount() async {
+    try {
+      final count = await ApiService.getCreatedBySheetsCount();
+      if (mounted) {
+        setState(() {
+          _createdBySheetsCount = count;
+        });
+      }
+    } catch (e) {
+      // Игнорируем ошибки при загрузке количества
+    }
+  }
+  
+  /// Переключение режима отображения
+  Future<void> _toggleCreatedByMode() async {
+    final newMode = !_showCreatedByMode;
+    setState(() {
+      _showCreatedByMode = newMode;
+      _currentPage = 1;
+    });
+    await _loadSheets(page: 1);
+    // Всегда обновляем счетчик, чтобы он был актуальным
+    await _loadCreatedBySheetsCount();
   }
   
   /// Переход на страницу
@@ -757,6 +795,10 @@ class _TasksScreenState extends State<TasksScreen> {
       onTap: () {
         setState(() {
           _selectedTab = value;
+          // Сбрасываем режим created_by при переключении чипов
+          if (_showCreatedByMode) {
+            _showCreatedByMode = false;
+          }
           if (value == 'stages') {
             if (_stages.isEmpty && !_isLoadingStages) {
               _loadStages();
@@ -768,6 +810,10 @@ class _TasksScreenState extends State<TasksScreen> {
             if (_projects.isEmpty && !_isLoadingProjects) {
               _loadProjects();
             }
+          } else if (value == 'sheets') {
+            // При переключении на ИД загружаем данные заново
+            _currentPage = 1;
+            _loadSheets(page: 1);
           }
         });
       },
@@ -874,6 +920,7 @@ class _TasksScreenState extends State<TasksScreen> {
       onRefresh: _refreshSheets,
       child: Column(
         children: [
+          _buildCreatedByFilterButton(),
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -884,6 +931,68 @@ class _TasksScreenState extends State<TasksScreen> {
           ),
           _buildPaginationControls(),
         ],
+      ),
+    );
+  }
+  
+  /// Кнопка фильтрации по созданным пользователем ИД
+  Widget _buildCreatedByFilterButton() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ElevatedButton.icon(
+        onPressed: _toggleCreatedByMode,
+        icon: _showCreatedByMode
+            ? const Icon(Icons.filter_alt, color: AppColors.accentBlue)
+            : const Icon(Icons.filter_alt_outlined, color: AppColors.textPrimary),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'ИД - Созданные мною (невыполненные)',
+              style: TextStyle(
+                color: _showCreatedByMode
+                    ? AppColors.accentBlue
+                    : AppColors.textPrimary,
+                fontWeight: _showCreatedByMode
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+              ),
+            ),
+            if (_createdBySheetsCount > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.accentPink,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$_createdBySheetsCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _showCreatedByMode
+              ? AppColors.accentBlue.withOpacity(0.1)
+              : AppColors.cardBackground.withOpacity(0.6),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+              color: _showCreatedByMode
+                  ? AppColors.accentBlue
+                  : AppColors.borderColor.withOpacity(0.5),
+              width: _showCreatedByMode ? 2 : 1,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1090,8 +1199,16 @@ class _TasksScreenState extends State<TasksScreen> {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (column == 'isCompleted') ...[
+          if (column == 'isCompleted' && !_showCreatedByMode) ...[
             _buildCompletedDropdown(),
+          ] else if (column == 'isCompleted' && _showCreatedByMode) ...[
+            const Text(
+              'Выполнено',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ] else if (isSearchActive) ...[
             SizedBox(
               width: 120,

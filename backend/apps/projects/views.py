@@ -228,6 +228,10 @@ class ProjectSheetViewSet(viewsets.ModelViewSet):
             is_completed_bool = is_completed.lower() in ('true', '1', 'yes')
             queryset = queryset.filter(is_completed=is_completed_bool)
         
+        # Фильтр по создателю (created_by)
+        if self.request.query_params.get('filter_by_created_by') == 'true':
+            queryset = queryset.filter(created_by=self.request.user)
+        
         # Сортировка: 1. Выполненные внизу, 2. По отделам, 3. По алфавиту
         queryset = queryset.order_by(
             'is_completed',  # False сначала, True потом (выполненные внизу)

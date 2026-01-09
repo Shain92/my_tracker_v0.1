@@ -2465,6 +2465,7 @@ class ApiService {
     int? projectId,
     bool? isCompleted,
     int? departmentId,
+    bool? filterByCreatedBy,
     int page = 1,
     int pageSize = 100,
   }) async {
@@ -2490,9 +2491,13 @@ class ApiService {
       }
       if (departmentId != null) {
         queryParams['department_id'] = departmentId.toString();
-      } else {
-        // Если departmentId не указан, используем автоматическую фильтрацию по отделу пользователя
+      } else if (filterByCreatedBy != true) {
+        // Если departmentId не указан и не фильтруем по created_by, используем автоматическую фильтрацию по отделу пользователя
         queryParams['filter_by_user_department'] = 'true';
+      }
+      
+      if (filterByCreatedBy == true) {
+        queryParams['filter_by_created_by'] = 'true';
       }
 
       final uri = Uri.parse('$baseUrl/projects/project-sheets/').replace(
@@ -2577,6 +2582,32 @@ class ApiService {
       }
     } catch (e) {
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
+  /// Получение количества невыполненных ИД с файлами, созданных пользователем
+  static Future<int> getCreatedBySheetsCount() async {
+    try {
+      final result = await getDepartmentSheets(
+        filterByCreatedBy: true,
+        isCompleted: false,
+        page: 1,
+        pageSize: 1000, // Большой размер для получения всех записей
+      );
+
+      if (result['success'] == true) {
+        final data = result['data'] as List;
+        // Подсчитываем количество записей с прикрепленными файлами
+        final count = data.where((sheet) {
+          final sheetData = sheet as Map<String, dynamic>;
+          final fileUrl = sheetData['file_url'] as String?;
+          return fileUrl != null && fileUrl.isNotEmpty;
+        }).length;
+        return count;
+      }
+      return 0;
+    } catch (e) {
+      return 0;
     }
   }
 
