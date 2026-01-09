@@ -1987,8 +1987,8 @@ class _TasksScreenState extends State<TasksScreen> {
         DataCell(
           Text(
             '${(project.completionPercentage ?? 0.0).toStringAsFixed(1)}%',
-            style: const TextStyle(
-              color: AppColors.textPrimary,
+            style: TextStyle(
+              color: _getPercentageColor(project.completionPercentage ?? 0.0),
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -2219,6 +2219,22 @@ class _TasksScreenState extends State<TasksScreen> {
         ],
       ),
     );
+  }
+
+  /// Получение цвета для процента выполнения (от красного 0% до зеленого 100%)
+  Color _getPercentageColor(double percentage) {
+    // Ограничиваем процент в диапазоне 0-100
+    final clampedPercentage = percentage.clamp(0.0, 100.0);
+    
+    // Вычисляем компоненты цвета
+    // Красный: от 255 (0%) до 0 (100%)
+    final red = (255 * (1 - clampedPercentage / 100)).round();
+    // Зеленый: от 0 (0%) до 255 (100%)
+    final green = (255 * (clampedPercentage / 100)).round();
+    // Синий: 0 для чистого красного/зеленого
+    final blue = 0;
+    
+    return Color.fromRGBO(red, green, blue, 1.0);
   }
 
   /// Преобразование HEX цвета в Color
