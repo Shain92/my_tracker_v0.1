@@ -717,7 +717,7 @@ class ApiService {
     return prefs.getString('current_screen');
   }
 
-  /// Получение списка проектов
+  /// Получение списка проектов (загружает все страницы автоматически)
   static Future<Map<String, dynamic>> getProjects({int? constructionSiteId}) async {
     try {
       var token = await getAccessToken();
@@ -725,72 +725,93 @@ class ApiService {
         return {'success': false, 'error': 'Не авторизован', 'requiresLogin': true};
       }
 
-      var uri = Uri.parse('$baseUrl/projects/projects/');
+      List<dynamic> allResults = [];
+      String? nextUrl;
+      
+      // Формируем базовый URL
+      var baseUri = Uri.parse('$baseUrl/projects/projects/');
       if (constructionSiteId != null) {
-        uri = uri.replace(queryParameters: {'construction_site_id': constructionSiteId.toString()});
+        baseUri = baseUri.replace(queryParameters: {'construction_site_id': constructionSiteId.toString()});
       }
+      nextUrl = baseUri.toString();
 
-      var response = await http.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
+      // Загружаем все страницы
+      while (nextUrl != null) {
+        var uri = Uri.parse(nextUrl);
+        
+        var response = await http.get(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
 
-      if (response.statusCode == 401) {
-        final refreshed = await refreshAccessToken();
-        if (refreshed) {
-          token = await getAccessToken();
-          if (token != null) {
-            response = await http.get(
-              uri,
-              headers: {
-                'Authorization': 'Bearer $token',
-                'Content-Type': 'application/json',
-              },
-            );
+        if (response.statusCode == 401) {
+          final refreshed = await refreshAccessToken();
+          if (refreshed) {
+            token = await getAccessToken();
+            if (token != null) {
+              // Повторяем запрос с новым токеном
+              response = await http.get(
+                uri,
+                headers: {
+                  'Authorization': 'Bearer $token',
+                  'Content-Type': 'application/json',
+                },
+              );
+            } else {
+              // Токен не получен после обновления - требуется перелогин
+              return {'success': false, 'error': 'Требуется авторизация', 'requiresLogin': true};
+            }
           } else {
-            // Токен не получен после обновления - требуется перелогин
+            // Не удалось обновить токен - требуется перелогин
             return {'success': false, 'error': 'Требуется авторизация', 'requiresLogin': true};
           }
-        } else {
-          // Не удалось обновить токен - требуется перелогин
-          return {'success': false, 'error': 'Требуется авторизация', 'requiresLogin': true};
         }
-      }
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        // Обработка ответа с пагинацией
-        if (data is Map<String, dynamic> && data.containsKey('results')) {
-          final results = data['results'] as List? ?? [];
-          return {'success': true, 'data': results};
-        } else if (data is List) {
-          return {'success': true, 'data': data};
-        } else {
-          return {'success': true, 'data': [data]};
-        }
-      } else {
-        String errorMessage = 'Ошибка получения списка проектов';
-        try {
-          final error = jsonDecode(response.body);
-          if (error is Map<String, dynamic>) {
-            errorMessage = error['error'] ?? error['detail'] ?? error['message'] ?? errorMessage;
-          } else if (error is String) {
-            errorMessage = error;
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          
+          // Обработка ответа с пагинацией
+          if (data is Map<String, dynamic> && data.containsKey('results')) {
+            final results = data['results'] as List? ?? [];
+            allResults.addAll(results);
+            nextUrl = data['next'] as String?;
+          } else if (data is List) {
+            allResults.addAll(data);
+            nextUrl = null; // Если это список, значит пагинации нет
+          } else {
+            allResults.add(data);
+            nextUrl = null;
           }
-        } catch (e) {
-          // Если не удалось распарсить JSON, используем текст ответа
-          errorMessage = response.body.isNotEmpty 
-              ? response.body 
-              : 'Ошибка ${response.statusCode}: ${response.reasonPhrase ?? 'Неизвестная ошибка'}';
+        } else {
+          // Если это первая страница и ошибка, возвращаем ошибку
+          if (allResults.isEmpty) {
+            String errorMessage = 'Ошибка получения списка проектов';
+            try {
+              final error = jsonDecode(response.body);
+              if (error is Map<String, dynamic>) {
+                errorMessage = error['error'] ?? error['detail'] ?? error['message'] ?? errorMessage;
+              } else if (error is String) {
+                errorMessage = error;
+              }
+            } catch (e) {
+              // Если не удалось распарсить JSON, используем текст ответа
+              errorMessage = response.body.isNotEmpty 
+                  ? response.body 
+                  : 'Ошибка ${response.statusCode}: ${response.reasonPhrase ?? 'Неизвестная ошибка'}';
+            }
+            final requiresLogin = response.statusCode == 401;
+            return {'success': false, 'error': errorMessage, 'requiresLogin': requiresLogin};
+          } else {
+            // Если уже загрузили часть данных, возвращаем то, что есть
+            break;
+          }
         }
-        // Если снова 401 после обновления токена, требуется перелогин
-        final requiresLogin = response.statusCode == 401;
-        return {'success': false, 'error': errorMessage, 'requiresLogin': requiresLogin};
       }
+      
+      return {'success': true, 'data': allResults};
     } catch (e) {
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
     }
