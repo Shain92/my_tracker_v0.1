@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.db import connection
-from django.db.models import Q
 from pathlib import Path
 import json
 import os
@@ -66,48 +65,18 @@ class ProjectAdmin(admin.ModelAdmin):
     raw_id_fields = ['construction_site']
 
 
-class HasFileFilter(admin.SimpleListFilter):
-    """Фильтр по наличию файла"""
-    title = 'Наличие файла'
-    parameter_name = 'has_file'
-
-    def lookups(self, request, model_admin):
-        return (
-            ('yes', 'Есть файл'),
-            ('no', 'Нет файла'),
-        )
-
-    def queryset(self, request, queryset):
-        if self.value() == 'yes':
-            return queryset.exclude(file='').exclude(file__isnull=True)
-        if self.value() == 'no':
-            return queryset.filter(Q(file='') | Q(file__isnull=True))
-        return queryset
-
-
 @admin.register(ProjectSheet)
 class ProjectSheetAdmin(admin.ModelAdmin):
-    list_display = ['name', 'project', 'status', 'responsible_department', 'created_by', 'has_file_display', 'is_completed', 'completed_at', 'created_at']
-    list_filter = ['status', 'is_completed', 'created_at', 'project', 'responsible_department', 'created_by', HasFileFilter]
+    list_display = ['name', 'project', 'status', 'responsible_department', 'is_completed', 'completed_at', 'created_at']
+    list_filter = ['status', 'is_completed', 'created_at', 'project', 'responsible_department']
     search_fields = ['name', 'description']
-    raw_id_fields = ['project', 'status', 'responsible_department', 'created_by']
+    raw_id_fields = ['project', 'status', 'responsible_department']
     fields = [
         'name', 'description', 'project', 'status', 
         'responsible_department', 'file', 'is_completed', 
         'completed_at', 'created_by', 'created_at', 'updated_at'
     ]
     readonly_fields = ['completed_at', 'created_at', 'updated_at']
-
-    def has_file_display(self, obj):
-        """Отображение наличия файла"""
-        if obj.file:
-            return format_html(
-                '<span style="color: green;">✓ Есть</span>'
-            )
-        return format_html(
-            '<span style="color: red;">✗ Нет</span>'
-        )
-    has_file_display.short_description = 'Файл'
 
 
 @admin.register(ProjectStage)

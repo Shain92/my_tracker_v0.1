@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'project_detail_screen.dart';
 import 'site_projects_screen.dart';
 import 'login_screen.dart';
+import '../utils/web_utils.dart';
 
 /// Экран задач - список листов отдела пользователя
 class TasksScreen extends StatefulWidget {
@@ -67,6 +68,7 @@ class _TasksScreenState extends State<TasksScreen> {
   Map<String, String> _columnFilters = {};
   Set<String> _activeFilterColumns = {};
   String? _completedFilter = 'not_completed'; // null, 'completed', 'not_completed'
+  String? _fileFilter; // null, 'with_file', 'without_file'
   Map<String, TextEditingController> _searchControllers = {};
   
   // Фильтрация для этапов
@@ -87,6 +89,9 @@ class _TasksScreenState extends State<TasksScreen> {
   // Режим отображения созданных пользователем ИД
   bool _showCreatedByMode = false;
   int _createdBySheetsCount = 0;
+  
+  // Состояние скачивания файла
+  int? _downloadingFileId;
 
   @override
   void initState() {
@@ -127,12 +132,20 @@ class _TasksScreenState extends State<TasksScreen> {
 
     try {
       final currentPage = page ?? _currentPage;
-      final result = await ApiService.getDepartmentSheets(
-        page: currentPage,
-        pageSize: _pageSize,
-        filterByCreatedBy: _showCreatedByMode ? true : null,
-        isCompleted: _showCreatedByMode ? false : null,
-      );
+      
+      // В режиме created_by загружаем все записи без пагинации
+      final Map<String, dynamic> result;
+      if (_showCreatedByMode) {
+        result = await ApiService.getAllDepartmentSheets(
+          filterByCreatedBy: true,
+          isCompleted: false,
+        );
+      } else {
+        result = await ApiService.getDepartmentSheets(
+          page: currentPage,
+          pageSize: _pageSize,
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -144,7 +157,12 @@ class _TasksScreenState extends State<TasksScreen> {
                 .toList();
             
             // Обновление информации о пагинации
-            if (result['pagination'] != null) {
+            if (_showCreatedByMode) {
+              // В режиме created_by пагинация отключена
+              _currentPage = 1;
+              _totalPages = 1;
+              _totalCount = _sheets.length;
+            } else if (result['pagination'] != null) {
               final pagination = result['pagination'] as Map<String, dynamic>;
               _currentPage = pagination['currentPage'] as int? ?? 1;
               _totalPages = pagination['totalPages'] as int? ?? 1;
@@ -202,6 +220,11 @@ class _TasksScreenState extends State<TasksScreen> {
           final bDate = b.createdAt ?? '';
           comparison = aDate.compareTo(bDate);
           break;
+        case 'file':
+          final aHasFile = a.fileUrl != null && a.fileUrl!.isNotEmpty;
+          final bHasFile = b.fileUrl != null && b.fileUrl!.isNotEmpty;
+          comparison = aHasFile == bHasFile ? 0 : (aHasFile ? 1 : -1);
+          break;
       }
       
       return _sortAscending ? comparison : -comparison;
@@ -221,6 +244,19 @@ class _TasksScreenState extends State<TasksScreen> {
           return sheet.isCompleted;
         } else if (_completedFilter == 'not_completed') {
           return !sheet.isCompleted;
+        }
+        return true;
+      }).toList();
+    }
+    
+    // Фильтр по наличию файла
+    if (_fileFilter != null) {
+      filtered = filtered.where((sheet) {
+        final hasFile = sheet.fileUrl != null && sheet.fileUrl!.isNotEmpty;
+        if (_fileFilter == 'with_file') {
+          return hasFile;
+        } else if (_fileFilter == 'without_file') {
+          return !hasFile;
         }
         return true;
       }).toList();
@@ -1171,18 +1207,13 @@ class _TasksScreenState extends State<TasksScreen> {
         headingRowColor: WidgetStateProperty.all(
           AppColors.cardBackground.withOpacity(0.8),
         ),
-        dataRowColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return AppColors.accentBlue.withOpacity(0.2);
-          }
-          return null;
-        }),
         columns: [
           _buildDataColumn('Выполнено', 'isCompleted'),
           _buildDataColumn('Название', 'name'),
           _buildDataColumn('Проект', 'project'),
           _buildDataColumn('Участок', 'constructionSite'),
           _buildDataColumn('Статус', 'status'),
+          _buildDataColumn('Файл', 'file'),
           _buildDataColumn('Дата создания', 'createdAt'),
         ],
         rows: filteredSheets.map((sheet) => _buildDataRow(sheet)).toList(),
@@ -1194,6 +1225,27 @@ class _TasksScreenState extends State<TasksScreen> {
   DataColumn _buildDataColumn(String label, String column) {
     final hasFilter = _columnFilters[column]?.isNotEmpty ?? false;
     final isSearchActive = _activeFilterColumns.contains(column);
+    
+    // Столбец "Файл" с фильтром и сортировкой
+    if (column == 'file') {
+      return DataColumn(
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildFileFilterDropdown(),
+            if (_sortColumn == column) ...[
+              const SizedBox(width: 4),
+              Icon(
+                _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 16,
+                color: AppColors.accentBlue,
+              ),
+            ],
+          ],
+        ),
+        onSort: (columnIndex, ascending) => _onSort(column),
+      );
+    }
     
     return DataColumn(
       label: Row(
@@ -1303,6 +1355,31 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
   
+  /// Выпадающий список для фильтра "Файл"
+  Widget _buildFileFilterDropdown() {
+    return DropdownButton<String>(
+      value: _fileFilter,
+      isDense: true,
+      underline: const SizedBox.shrink(),
+      icon: const Icon(Icons.arrow_drop_down, size: 16),
+      items: const [
+        DropdownMenuItem(value: null, child: Text('Все', style: TextStyle(fontSize: 12))),
+        DropdownMenuItem(value: 'with_file', child: Text('Только с файлом', style: TextStyle(fontSize: 12))),
+        DropdownMenuItem(value: 'without_file', child: Text('Без файла', style: TextStyle(fontSize: 12))),
+      ],
+      onChanged: (value) {
+        setState(() {
+          _fileFilter = value;
+        });
+      },
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+  
   /// Выпадающий список для фильтра "Выполнено"
   Widget _buildCompletedDropdown() {
     return DropdownButton<String>(
@@ -1330,7 +1407,17 @@ class _TasksScreenState extends State<TasksScreen> {
 
   /// Построение строки таблицы
   DataRow _buildDataRow(ProjectSheetModel sheet) {
+    final hasFile = sheet.fileUrl != null && sheet.fileUrl!.isNotEmpty;
     return DataRow(
+      color: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return AppColors.accentBlue.withOpacity(0.2);
+        }
+        if (hasFile) {
+          return AppColors.accentGreen.withOpacity(0.1);
+        }
+        return null;
+      }),
       cells: [
         DataCell(
           Center(
@@ -1418,6 +1505,9 @@ class _TasksScreenState extends State<TasksScreen> {
           ),
         ),
         DataCell(
+          _buildFileCell(sheet),
+        ),
+        DataCell(
           Text(
             sheet.createdAt != null
                 ? _formatDate(sheet.createdAt!)
@@ -1427,6 +1517,122 @@ class _TasksScreenState extends State<TasksScreen> {
         ),
       ],
     );
+  }
+  
+  /// Построение ячейки с файлом
+  Widget _buildFileCell(ProjectSheetModel sheet) {
+    final hasFile = sheet.fileUrl != null && sheet.fileUrl!.isNotEmpty;
+    final isDownloading = _downloadingFileId == sheet.id;
+    
+    if (!hasFile) {
+      return const Text(
+        '—',
+        style: TextStyle(color: AppColors.textSecondary),
+      );
+    }
+    
+    if (isDownloading) {
+      return const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+        ),
+      );
+    }
+    
+    return Center(
+      child: GestureDetector(
+        onTap: () => _downloadSheetFile(sheet.id),
+        child: const Icon(
+          Icons.download,
+          color: AppColors.accentBlue,
+          size: 22,
+        ),
+      ),
+    );
+  }
+  
+  /// Скачивание файла проектного листа
+  Future<void> _downloadSheetFile(int sheetId) async {
+    setState(() {
+      _downloadingFileId = sheetId;
+    });
+    
+    try {
+      final result = await ApiService.downloadProjectSheetFile(sheetId);
+      
+      if (result['success'] == true) {
+        final bytes = result['data'] as List<int>;
+        final headers = result['headers'] as Map<String, String>;
+        
+        // Извлекаем имя файла из заголовка Content-Disposition
+        String filename = 'file_$sheetId.pdf';
+        final contentDisposition = headers['content-disposition'] ?? '';
+        if (contentDisposition.isNotEmpty) {
+          // Ищем имя файла в заголовке
+          final filenameIndex = contentDisposition.indexOf('filename=');
+          if (filenameIndex != -1) {
+            var startIndex = filenameIndex + 9; // длина "filename="
+            if (startIndex < contentDisposition.length) {
+              var endIndex = contentDisposition.indexOf(';', startIndex);
+              if (endIndex == -1) {
+                endIndex = contentDisposition.length;
+              }
+              var extractedFilename = contentDisposition.substring(startIndex, endIndex).trim();
+              // Убираем кавычки если есть
+              if (extractedFilename.startsWith('"') && extractedFilename.endsWith('"')) {
+                extractedFilename = extractedFilename.substring(1, extractedFilename.length - 1);
+              } else if (extractedFilename.startsWith("'") && extractedFilename.endsWith("'")) {
+                extractedFilename = extractedFilename.substring(1, extractedFilename.length - 1);
+              }
+              if (extractedFilename.isNotEmpty) {
+                filename = extractedFilename;
+              }
+            }
+          }
+        }
+        
+        // Скачиваем файл
+        downloadFileFromBytes(bytes, filename);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Файл "$filename" успешно скачан'),
+              backgroundColor: AppColors.accentGreen,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Ошибка скачивания файла'),
+              backgroundColor: AppColors.accentPink,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка скачивания: ${e.toString()}'),
+            backgroundColor: AppColors.accentPink,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _downloadingFileId = null;
+        });
+      }
+    }
   }
 
   /// Форматирование даты
@@ -2282,7 +2488,8 @@ class _TasksScreenState extends State<TasksScreen> {
 
   /// Построение элементов управления пагинацией
   Widget _buildPaginationControls() {
-    if (_totalPages <= 1) {
+    // В режиме created_by пагинация отключена
+    if (_showCreatedByMode || _totalPages <= 1) {
       return const SizedBox.shrink();
     }
 

@@ -2585,14 +2585,69 @@ class ApiService {
     }
   }
 
+  /// Получение всех листов отдела (загружает все страницы)
+  static Future<Map<String, dynamic>> getAllDepartmentSheets({
+    int? constructionSiteId,
+    int? projectId,
+    bool? isCompleted,
+    int? departmentId,
+    bool? filterByCreatedBy,
+  }) async {
+    try {
+      List<dynamic> allData = [];
+      int currentPage = 1;
+      bool hasNext = true;
+      const pageSize = 100; // Используем разумный размер страницы
+      
+      while (hasNext) {
+        final result = await getDepartmentSheets(
+          constructionSiteId: constructionSiteId,
+          projectId: projectId,
+          isCompleted: isCompleted,
+          departmentId: departmentId,
+          filterByCreatedBy: filterByCreatedBy,
+          page: currentPage,
+          pageSize: pageSize,
+        );
+        
+        if (result['success'] == true) {
+          final data = result['data'] as List;
+          allData.addAll(data);
+          
+          final pagination = result['pagination'] as Map<String, dynamic>?;
+          if (pagination != null) {
+            hasNext = pagination['hasNext'] as bool? ?? false;
+            currentPage++;
+          } else {
+            hasNext = false;
+          }
+        } else {
+          hasNext = false;
+        }
+      }
+      
+      return {
+        'success': true,
+        'data': allData,
+        'pagination': {
+          'count': allData.length,
+          'currentPage': 1,
+          'totalPages': 1,
+          'hasNext': false,
+          'hasPrevious': false,
+        },
+      };
+    } catch (e) {
+      return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
+    }
+  }
+
   /// Получение количества невыполненных ИД с файлами, созданных пользователем
   static Future<int> getCreatedBySheetsCount() async {
     try {
-      final result = await getDepartmentSheets(
+      final result = await getAllDepartmentSheets(
         filterByCreatedBy: true,
         isCompleted: false,
-        page: 1,
-        pageSize: 1000, // Большой размер для получения всех записей
       );
 
       if (result['success'] == true) {
