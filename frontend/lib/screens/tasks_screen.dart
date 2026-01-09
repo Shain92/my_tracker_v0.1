@@ -58,6 +58,11 @@ class _TasksScreenState extends State<TasksScreen> {
   Map<String, String> _columnFiltersStages = {};
   Set<String> _activeFilterColumnsStages = {};
   Map<String, TextEditingController> _searchControllersStages = {};
+  
+  // Фильтр статусов для этапов
+  List<StatusModel> _stageStatuses = [];
+  Set<int> _selectedStatusIds = {};
+  bool _isLoadingStatuses = false;
 
   @override
   void initState() {
@@ -338,6 +343,17 @@ class _TasksScreenState extends State<TasksScreen> {
   List<ProjectStageModel> _applyFiltersStages() {
     List<ProjectStageModel> filtered = List.from(_stages);
     
+    // Фильтр по статусам
+    if (_selectedStatusIds.isNotEmpty) {
+      filtered = filtered.where((stage) {
+        if (stage.status == null && stage.statusId == null) {
+          return false; // Не показываем этапы без статуса
+        }
+        final statusId = stage.status?.id ?? stage.statusId;
+        return statusId != null && _selectedStatusIds.contains(statusId);
+      }).toList();
+    }
+    
     // Фильтры по текстовым столбцам
     for (final entry in _columnFiltersStages.entries) {
       final column = entry.key;
@@ -349,9 +365,6 @@ class _TasksScreenState extends State<TasksScreen> {
         String text = '';
         
         switch (column) {
-          case 'status':
-            text = (stage.status?.name ?? '').toLowerCase();
-            break;
           case 'description':
             text = (stage.description ?? '').toLowerCase();
             break;
@@ -392,6 +405,43 @@ class _TasksScreenState extends State<TasksScreen> {
   Future<void> _refreshStages() async {
     _currentPageStages = 1;
     await _loadStages(page: 1);
+  }
+
+  /// Загрузка статусов этапов
+  Future<void> _loadStageStatuses() async {
+    if (_stageStatuses.isNotEmpty) return; // Уже загружены
+    
+    setState(() {
+      _isLoadingStatuses = true;
+    });
+
+    try {
+      final result = await ApiService.getStatuses(statusType: 'stage');
+
+      if (mounted) {
+        setState(() {
+          _isLoadingStatuses = false;
+          if (result['success'] == true) {
+            final data = result['data'] as List;
+            _stageStatuses = data
+                .map((json) => StatusModel.fromJson(json as Map<String, dynamic>))
+                .toList();
+            
+            // По умолчанию выбрать все статусы кроме "Завершен"
+            _selectedStatusIds = _stageStatuses
+                .where((status) => status.name.toLowerCase() != 'завершен')
+                .map((status) => status.id)
+                .toSet();
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingStatuses = false;
+        });
+      }
+    }
   }
   
   /// Переход на страницу для этапов
@@ -502,8 +552,13 @@ class _TasksScreenState extends State<TasksScreen> {
       onTap: () {
         setState(() {
           _selectedTab = value;
-          if (value == 'stages' && _stages.isEmpty && !_isLoadingStages) {
-            _loadStages();
+          if (value == 'stages') {
+            if (_stages.isEmpty && !_isLoadingStages) {
+              _loadStages();
+            }
+            if (_stageStatuses.isEmpty && !_isLoadingStatuses) {
+              _loadStageStatuses();
+            }
           }
         });
       },
@@ -1052,6 +1107,47 @@ class _TasksScreenState extends State<TasksScreen> {
     final hasFilter = _columnFiltersStages[column]?.isNotEmpty ?? false;
     final isSearchActive = _activeFilterColumnsStages.contains(column);
     
+    // Для столбца "Статус" показываем выпадающий список вместо поиска
+    if (column == 'status') {
+      final hasStatusFilter = _selectedStatusIds.isNotEmpty && 
+          _selectedStatusIds.length < _stageStatuses.length;
+      
+      return DataColumn(
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => _showStatusFilterDialog(),
+              child: Icon(
+                Icons.filter_list,
+                size: 16,
+                color: hasStatusFilter
+                    ? AppColors.accentBlue
+                    : AppColors.textSecondary,
+              ),
+            ),
+            if (_sortColumnStages == column) ...[
+              const SizedBox(width: 4),
+              Icon(
+                _sortAscendingStages ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 16,
+                color: AppColors.accentBlue,
+              ),
+            ],
+          ],
+        ),
+        onSort: (columnIndex, ascending) => _onSortStages(column),
+      );
+    }
+    
     return DataColumn(
       label: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1098,6 +1194,165 @@ class _TasksScreenState extends State<TasksScreen> {
       ),
       onSort: (columnIndex, ascending) => _onSortStages(column),
     );
+  }
+
+  /// Показать диалог фильтра статусов
+  void _showStatusFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppColors.cardBackground,
+              titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              title: const Text(
+                'Фильтр по статусам',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: SizedBox(
+                width: 280,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.5,
+                  ),
+                  child: _stageStatuses.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _stageStatuses.length,
+                        itemBuilder: (context, index) {
+                          final status = _stageStatuses[index];
+                          final isSelected = _selectedStatusIds.contains(status.id);
+                          
+                          return InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                if (isSelected) {
+                                  _selectedStatusIds.remove(status.id);
+                                } else {
+                                  _selectedStatusIds.add(status.id);
+                                }
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: Checkbox(
+                                      value: isSelected,
+                                      onChanged: (bool? value) {
+                                        setDialogState(() {
+                                          if (value == true) {
+                                            _selectedStatusIds.add(status.id);
+                                          } else {
+                                            _selectedStatusIds.remove(status.id);
+                                          }
+                                        });
+                                      },
+                                      activeColor: AppColors.accentBlue,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: _parseColor(status.color),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      status.name,
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    setDialogState(() {
+                      // Выбрать все
+                      _selectedStatusIds = _stageStatuses
+                          .map((s) => s.id)
+                          .toSet();
+                    });
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  ),
+                  child: const Text(
+                    'Все',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setDialogState(() {
+                      // Снять все
+                      _selectedStatusIds.clear();
+                    });
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  ),
+                  child: const Text(
+                    'Нет',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  ),
+                  child: const Text(
+                    'Закрыть',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((_) {
+      setState(() {
+        // Обновляем UI после закрытия диалога
+      });
+    });
   }
   
   /// Поисковое поле в заголовке столбца для этапов
