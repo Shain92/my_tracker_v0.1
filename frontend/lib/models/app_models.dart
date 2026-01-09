@@ -278,6 +278,8 @@ class ProjectModel {
   final ConstructionSiteModel? constructionSite;
   final int? constructionSiteId;
   final double? completionPercentage;
+  final StatusModel? lastStageStatus;
+  final int? lastStageStatusId;
   final String? createdAt;
   final String? updatedAt;
 
@@ -290,6 +292,8 @@ class ProjectModel {
     this.constructionSite,
     this.constructionSiteId,
     this.completionPercentage,
+    this.lastStageStatus,
+    this.lastStageStatusId,
     this.createdAt,
     this.updatedAt,
   });
@@ -299,6 +303,13 @@ class ProjectModel {
     if (json['construction_site'] != null) {
       constructionSite = ConstructionSiteModel.fromJson(
         json['construction_site'] as Map<String, dynamic>,
+      );
+    }
+
+    StatusModel? lastStageStatus;
+    if (json['last_stage_status'] != null) {
+      lastStageStatus = StatusModel.fromJson(
+        json['last_stage_status'] as Map<String, dynamic>,
       );
     }
 
@@ -313,6 +324,8 @@ class ProjectModel {
       completionPercentage: json['completion_percentage'] != null
           ? (json['completion_percentage'] as num).toDouble()
           : null,
+      lastStageStatus: lastStageStatus,
+      lastStageStatusId: json['last_stage_status_id'] as int?,
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
     );
@@ -328,6 +341,8 @@ class ProjectModel {
       'construction_site': constructionSite?.toJson(),
       'construction_site_id': constructionSiteId,
       'completion_percentage': completionPercentage,
+      'last_stage_status': lastStageStatus?.toJson(),
+      'last_stage_status_id': lastStageStatusId,
       'created_at': createdAt,
       'updated_at': updatedAt,
     };

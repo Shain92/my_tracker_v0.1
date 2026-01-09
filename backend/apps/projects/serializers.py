@@ -106,13 +106,15 @@ class ProjectSerializer(serializers.ModelSerializer):
         write_only=True
     )
     completion_percentage = serializers.ReadOnlyField()
+    last_stage_status = StatusSerializer(read_only=True)
     
     class Meta:
         model = Project
         fields = [
             'id', 'name', 'description', 'code', 'cipher',
             'construction_site', 'construction_site_id',
-            'completion_percentage', 'created_at', 'updated_at'
+            'completion_percentage', 'last_stage_status',
+            'created_at', 'updated_at'
         ]
 
 

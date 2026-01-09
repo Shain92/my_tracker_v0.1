@@ -569,6 +569,11 @@ class _TasksScreenState extends State<TasksScreen> {
           final bPercent = b.completionPercentage ?? 0.0;
           comparison = aPercent.compareTo(bPercent);
           break;
+        case 'status':
+          final aStatus = a.lastStageStatus?.name ?? '';
+          final bStatus = b.lastStageStatus?.name ?? '';
+          comparison = aStatus.compareTo(bStatus);
+          break;
         case 'constructionSite':
           final aSite = a.constructionSite?.name ?? '';
           final bSite = b.constructionSite?.name ?? '';
@@ -600,6 +605,9 @@ class _TasksScreenState extends State<TasksScreen> {
             break;
           case 'description':
             text = (project.description ?? '').toLowerCase();
+            break;
+          case 'status':
+            text = (project.lastStageStatus?.name ?? '').toLowerCase();
             break;
           case 'constructionSite':
             text = (project.constructionSite?.name ?? '').toLowerCase();
@@ -1821,6 +1829,7 @@ class _TasksScreenState extends State<TasksScreen> {
           _buildDataColumnProjects('Наименование', 'name'),
           _buildDataColumnProjects('Описание', 'description'),
           _buildDataColumnProjects('ИД', 'completionPercentage'),
+          _buildDataColumnProjects('Статус', 'status'),
           _buildDataColumnProjects('Строительный участок', 'constructionSite'),
         ],
         rows: paginatedProjects.map((project) => _buildDataRowProjects(project)).toList(),
@@ -1876,14 +1885,14 @@ class _TasksScreenState extends State<TasksScreen> {
               ),
             ),
           ],
-          if (_sortColumnProjects == column && !isSearchActive && column != 'completionPercentage') ...[
+          if (_sortColumnProjects == column && !isSearchActive && (column == 'completionPercentage' || column == 'status')) ...[
             const SizedBox(width: 4),
             Icon(
               _sortAscendingProjects ? Icons.arrow_upward : Icons.arrow_downward,
               size: 16,
               color: AppColors.accentBlue,
             ),
-          ] else if (_sortColumnProjects == column && column == 'completionPercentage') ...[
+          ] else if (_sortColumnProjects == column && !isSearchActive && column != 'completionPercentage' && column != 'status') ...[
             const SizedBox(width: 4),
             Icon(
               _sortAscendingProjects ? Icons.arrow_upward : Icons.arrow_downward,
@@ -1893,7 +1902,7 @@ class _TasksScreenState extends State<TasksScreen> {
           ],
         ],
       ),
-      onSort: column == 'completionPercentage' || !isSearchActive
+      onSort: (column == 'completionPercentage' || column == 'status' || !isSearchActive)
           ? (columnIndex, ascending) => _onSortProjects(column)
           : null,
     );
@@ -1982,6 +1991,34 @@ class _TasksScreenState extends State<TasksScreen> {
               color: AppColors.textPrimary,
               fontWeight: FontWeight.bold,
             ),
+          ),
+        ),
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (project.lastStageStatus != null) ...[
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: _parseColor(project.lastStageStatus!.color),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  project.lastStageStatus!.name,
+                  style: TextStyle(
+                    color: _parseColor(project.lastStageStatus!.color),
+                  ),
+                ),
+              ] else
+                const Text(
+                  '—',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+            ],
           ),
         ),
         DataCell(

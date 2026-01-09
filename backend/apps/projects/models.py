@@ -88,6 +88,14 @@ class Project(models.Model):
             return 0.0
         completed = sheets.filter(is_completed=True).count()
         return round((completed / sheets.count()) * 100, 2)
+    
+    @property
+    def last_stage_status(self):
+        """Статус последнего этапа проекта (по дате datetime)"""
+        last_stage = self.stages.order_by('-datetime').first()
+        if last_stage and last_stage.status:
+            return last_stage.status
+        return None
 
 
 class ProjectSheet(models.Model):
