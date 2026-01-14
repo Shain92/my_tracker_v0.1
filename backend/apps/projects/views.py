@@ -295,7 +295,18 @@ class ProjectStageViewSet(viewsets.ModelViewSet):
         """Фильтрация по проекту и пользователю"""
         queryset = super().get_queryset()
         
-        # Фильтр по пользователю (если указан user_id или используем текущего)
+        # Фильтр по проекту
+        project_id = self.request.query_params.get('project_id')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+            # Если указан project_id, показываем все этапы проекта без ограничения по пользователю
+            # Фильтр по строительному участку
+            construction_site_id = self.request.query_params.get('construction_site_id')
+            if construction_site_id:
+                queryset = queryset.filter(project__construction_site_id=construction_site_id)
+            return queryset
+        
+        # Если project_id не передан (запрос со страницы задач), применяем фильтрацию по пользователю
         user_id = self.request.query_params.get('user_id')
         if user_id:
             try:
@@ -310,12 +321,7 @@ class ProjectStageViewSet(viewsets.ModelViewSet):
                 Q(responsible_users=user) | Q(author=user)
             ).distinct()
         
-        # Фильтр по проекту
-        project_id = self.request.query_params.get('project_id')
-        if project_id:
-            queryset = queryset.filter(project_id=project_id)
-        
-        # Фильтр по строительному участку
+        # Фильтр по строительному участку (для страницы задач)
         construction_site_id = self.request.query_params.get('construction_site_id')
         if construction_site_id:
             queryset = queryset.filter(project__construction_site_id=construction_site_id)
