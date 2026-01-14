@@ -2,11 +2,95 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 /// Сервис для работы с API
 class ApiService {
-  // Для Web используем localhost, для мобильных устройств может потребоваться изменение
-  static const String baseUrl = 'http://localhost:8000/api';
+  static String? _customBaseUrl;
+  
+  /// Вспомогательная функция для логирования отладки
+  static void _debugLog(String location, String message, Map<String, dynamic> data, String hypothesisId) {
+    try {
+      final logData = {
+        'location': location,
+        'message': message,
+        'data': data,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'sessionId': 'debug-session',
+        'runId': 'run1',
+        'hypothesisId': hypothesisId,
+      };
+      http.post(
+        Uri.parse('http://127.0.0.1:7243/ingest/b5f62dad-bcab-4013-80e0-c6a155923c6a'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(logData),
+      ).catchError((_) => http.Response('', 500));
+    } catch (e) {
+      // Игнорируем ошибки логирования
+    }
+  }
+  
+  /// Получение базового URL в зависимости от платформы
+  static String get baseUrl {
+    // Если установлен кастомный URL, используем его
+    if (_customBaseUrl != null) {
+      // #region agent log
+      _debugLog('api_service.dart:20', 'Using custom baseUrl', {'baseUrl': _customBaseUrl}, 'A');
+      // #endregion
+      return _customBaseUrl!;
+    }
+    
+    if (kIsWeb) {
+      // Для Web определяем хост из window.location
+      // Это позволяет работать с мобильных устройств по IP адресу
+      String hostname = 'localhost';
+      try {
+        final locationHostname = html.window.location.hostname;
+        // #region agent log
+        _debugLog('api_service.dart:30', 'Getting window.location.hostname', {
+          'hostname': locationHostname,
+          'fullUrl': html.window.location.href,
+        }, 'A');
+        // #endregion
+        hostname = locationHostname ?? 'localhost';
+        // Если hostname localhost или 127.0.0.1, оставляем localhost
+        // Иначе используем реальный IP адрес
+        if (hostname == 'localhost' || hostname == '127.0.0.1') {
+          hostname = 'localhost';
+        }
+      } catch (e) {
+        // #region agent log
+        _debugLog('api_service.dart:40', 'Error getting hostname, using localhost', {'error': e.toString()}, 'A');
+        // #endregion
+        hostname = 'localhost';
+      }
+      final webBaseUrl = 'http://$hostname:8000/api';
+      // #region agent log
+      _debugLog('api_service.dart:44', 'Web baseUrl determined', {'baseUrl': webBaseUrl, 'hostname': hostname}, 'A');
+      // #endregion
+      return webBaseUrl;
+    } else {
+      // Для мобильных устройств используем IP адрес компьютера
+      // По умолчанию для Android эмулятора используется 10.0.2.2
+      // Для реального устройства замените на IP вашего компьютера в локальной сети
+      // Например: http://192.168.1.100:8000/api
+      return 'http://10.0.2.2:8000/api';
+    }
+  }
+  
+  /// Установка базового URL (для настройки с мобильного устройства)
+  /// Используйте IP адрес вашего компьютера в локальной сети
+  /// Например: ApiService.setBaseUrl('http://192.168.1.100:8000/api')
+  static void setBaseUrl(String url) {
+    _customBaseUrl = url;
+  }
+  
+  /// Сброс базового URL к значению по умолчанию
+  static void resetBaseUrl() {
+    _customBaseUrl = null;
+  }
   
   /// Сохранение токена
   static Future<void> saveToken(String accessToken, String refreshToken) async {
@@ -115,14 +199,28 @@ class ApiService {
   /// Вход пользователя
   static Future<Map<String, dynamic>> login(String username, String password) async {
     try {
+      final loginUrl = '$baseUrl/auth/login/';
+      // #region agent log
+      _debugLog('api_service.dart:165', 'Login attempt started', {
+        'loginUrl': loginUrl,
+        'baseUrl': baseUrl,
+        'username': username,
+      }, 'A');
+      // #endregion
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/login/'),
+        Uri.parse(loginUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': username,
           'password': password,
         }),
       );
+      // #region agent log
+      _debugLog('api_service.dart:178', 'Login response received', {
+        'statusCode': response.statusCode,
+        'responseBody': response.body.length > 200 ? response.body.substring(0, 200) : response.body,
+      }, 'A');
+      // #endregion
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -140,9 +238,21 @@ class ApiService {
         return {'success': true, 'user': data['user']};
       } else {
         final error = jsonDecode(response.body);
+        // #region agent log
+        _debugLog('api_service.dart:201', 'Login failed', {
+          'statusCode': response.statusCode,
+          'error': error,
+        }, 'A');
+        // #endregion
         return {'success': false, 'error': error['error'] ?? 'Ошибка входа'};
       }
     } catch (e) {
+      // #region agent log
+      _debugLog('api_service.dart:208', 'Login exception', {
+        'error': e.toString(),
+        'errorType': e.runtimeType.toString(),
+      }, 'A');
+      // #endregion
       return {'success': false, 'error': 'Ошибка подключения: ${e.toString()}'};
     }
   }

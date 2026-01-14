@@ -79,6 +79,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       labelText: 'Username',
                       border: OutlineInputBorder(),
                     ),
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.none,
+                    autofillHints: const [AutofillHints.username],
+                    enableSuggestions: false,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Введите username';
@@ -94,6 +99,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       border: OutlineInputBorder(),
                     ),
                     obscureText: true,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.none,
+                    autofillHints: const [AutofillHints.newPassword],
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    canRequestFocus: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Введите пароль';
@@ -112,6 +124,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       border: OutlineInputBorder(),
                     ),
                     obscureText: true,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.done,
+                    textCapitalization: TextCapitalization.none,
+                    autofillHints: const [AutofillHints.newPassword],
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    canRequestFocus: true,
+                    onFieldSubmitted: (_) => _handleRegister(),
                     validator: (value) {
                       if (value != _passwordController.text) {
                         return 'Пароли не совпадают';

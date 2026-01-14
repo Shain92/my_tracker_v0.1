@@ -19,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -79,25 +80,21 @@ class _LoginScreenState extends State<LoginScreen> {
               constraints: const BoxConstraints(maxWidth: 400),
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(32.0),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardBackground.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: AppColors.borderColor.withOpacity(0.5),
-                          width: 1,
-                        ),
-                      ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
+                child: Container(
+                  padding: const EdgeInsets.all(32.0),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBackground.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.borderColor.withOpacity(0.5),
+                      width: 1,
+                    ),
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
                             const Text(
                               'Logic',
                               style: TextStyle(
@@ -115,6 +112,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 labelText: 'Username',
                                 labelStyle: TextStyle(color: AppColors.textSecondary),
                               ),
+                              keyboardType: TextInputType.text,
+                              textInputAction: TextInputAction.next,
+                              textCapitalization: TextCapitalization.none,
+                              autofillHints: const [AutofillHints.username],
+                              enableSuggestions: false,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Введите username';
@@ -126,11 +128,30 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextFormField(
                               controller: _passwordController,
                               style: const TextStyle(color: AppColors.textPrimary),
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Password',
-                                labelStyle: TextStyle(color: AppColors.textSecondary),
+                                labelStyle: const TextStyle(color: AppColors.textSecondary),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
                               ),
-                              obscureText: true,
+                              obscureText: _obscurePassword,
+                              obscuringCharacter: '•',
+                              keyboardType: TextInputType.visiblePassword,
+                              textInputAction: TextInputAction.done,
+                              textCapitalization: TextCapitalization.none,
+                              autofillHints: const [AutofillHints.password],
+                              enableSuggestions: false,
+                              autocorrect: false,
+                              onFieldSubmitted: (_) => _handleLogin(),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Введите пароль';
@@ -176,11 +197,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               },
                               child: const Text('Нет аккаунта? Зарегистрироваться'),
                             ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ),

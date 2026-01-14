@@ -24,6 +24,7 @@ show_menu() {
     echo -e "${GREEN}3.${NC} Запустить с пересборкой (--build)"
     echo -e "${GREEN}4.${NC} Запустить без пересборки"
     echo -e "${GREEN}5.${NC} Запуск фронтенда (Flutter)"
+    echo -e "${GREEN}  5.1${NC} Запуск с доступом из локальной сети"
     echo -e "${GREEN}6.${NC} Просмотр логов"
     echo -e "${GREEN}7.${NC} Статус контейнеров"
     echo -e "${GREEN}8.${NC} Создать миграции"
@@ -81,6 +82,47 @@ start_frontend() {
         echo -e "${RED}Flutter не найден! Установите Flutter SDK.${NC}"
     fi
     cd ..
+    read -p "Нажмите Enter для продолжения..."
+}
+
+# Функция запуска фронтенда с доступом из локальной сети
+start_frontend_network() {
+    echo -e "${YELLOW}Запуск Flutter фронтенда для локальной сети...${NC}"
+    
+    if ! command -v flutter &> /dev/null; then
+        echo -e "${RED}Flutter не найден! Установите Flutter SDK.${NC}"
+        read -p "Нажмите Enter для продолжения..."
+        return
+    fi
+    
+    # Получение IP адреса от пользователя
+    echo -e "${YELLOW}Введите IP адрес вашего компьютера в локальной сети${NC}"
+    echo -e "${YELLOW}Например: 192.168.32.32${NC}"
+    echo -e "${YELLOW}Для определения IP выполните: ipconfig | findstr IPv4${NC}"
+    echo ""
+    read -p "IP адрес: " local_ip
+    
+    if [ -z "$local_ip" ]; then
+        echo -e "${RED}IP адрес не указан. Запуск отменен.${NC}"
+        read -p "Нажмите Enter для продолжения..."
+        return
+    fi
+    
+    echo -e "${GREEN}════════════════════════════════════════${NC}"
+    echo -e "${GREEN}Приложение будет доступно по адресу:${NC}"
+    echo -e "${BLUE}http://${local_ip}:3000${NC}"
+    echo -e "${GREEN}════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}Для доступа с телефона или других устройств${NC}"
+    echo -e "${YELLOW}используйте адрес выше в браузере${NC}"
+    echo -e "${YELLOW}Запуск Flutter...${NC}"
+    echo ""
+    
+    cd frontend
+    # Используем реальный IP для правильной работы WebSocket соединения
+    # Флаг --web-allow-expose-url позволяет Flutter работать с сетевыми адресами
+    flutter run -d chrome --web-hostname=$local_ip --web-port=3000 --web-allow-expose-url
+    cd ..
+    
     read -p "Нажмите Enter для продолжения..."
 }
 
@@ -211,6 +253,9 @@ while true; do
             ;;
         5)
             start_frontend
+            ;;
+        5.1)
+            start_frontend_network
             ;;
         6)
             view_logs
